@@ -10,5 +10,8 @@
   "license": "ISC",
   "devDependencies": {
     "webpack": "file:../webpack-src"
+  },
+  "dependencies": {
+    "babel-polyfill": "^6.26.0"
   }
 }
