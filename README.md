@@ -935,5 +935,831 @@ console.log("hello webpack");
 
 pathinfo更多用法大家可以自己去看源码哦。
 
-### publichPath
+#### publichPath
+
+`string = ''` `function`
+
+对于按需加载(on-demand-load)或加载外部资源(external resources)（如图片、文件等）来说，output.publicPath 是很重要的选项。如果指定了一个错误的值，则在加载这些资源时会收到 404 错误。
+
+此选项指定在浏览器中所引用的「此输出目录对应的**公开 URL**」。相对 URL(relative URL) 会被相对于 HTML 页面（或 `` 标签）解析。相对于服务的 URL(Server-relative URL)，相对于协议的 URL(protocol-relative URL) 或绝对 URL(absolute URL) 也可是可能用到的，或者有时必须用到，例如：当将资源托管到 CDN 时。
+
+该选项的值是以 runtime(运行时) 或 loader(载入时) 所创建的每个 URL 为前缀。因此，在多数情况下，**此选项的值都会以`/`结束**。
+
+默认值是一个空字符串 `""`。
+
+我们写一个异步chunk，首先我们在src目录底下创建一个demo-publicpath.js文件：
+
+src/demo-publicpath.js
+
+```js
+export function say() {
+    document.body.append(document.createTextNode("hello webpack"))
+}
+```
+
+代码很简单，就是导出一个方法，然后在body中拼了一个文本节点。
+
+在index.js中引用demo-publicpath.js模块的say方法，
+
+src/index.js:
+
+```js
+import("./demo-publicpath").then((demoPublicPath) => {
+    demoPublicPath.say();
+});
+```
+
+ok，可以看到，我们用了es的一个动态导入，然后webpack判断是import动态导入会采用jsonp的形式加载对应的模块。
+
+看一下配置文件，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+    }
+};
+```
+
+打包编译：
+
+```js
+192:webpack-demo yinqingyang$ npx webpack
+Hash: 1f5ccbb68967d389dee1
+Version: webpack 5.0.0-beta.9
+Time: 132ms
+Built at: 2020-07-07 20:48:31
+                Asset       Size
+               app.js   8.97 KiB  [compared for emit]  [name: app]
+demo-publicpath_js.js  952 bytes  [emitted]
+Entrypoint app = app.js
+./index.js 84 bytes [built]
+./demo-publicpath.js 92 bytes [built]
+    + 7 hidden modules
+192:webpack-demo yinqingyang$ 
+
+```
+
+可以看到，打包过后生成了两个文件，
+
+lib/app.js:
+
+```js
+/******/ (() => { // webpackBootstrap
+/******/ 	var __webpack_modules__ = ({});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		if(__webpack_module_cache__[moduleId]) {
+/******/ 			return __webpack_module_cache__[moduleId].exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = __webpack_modules__;
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/ensure chunk */
+/******/ 	(() => {
+/******/ 		__webpack_require__.f = {};
+/******/ 		// This file contains only the entry chunk.
+/******/ 		// The chunk loading function for additional chunks
+/******/ 		__webpack_require__.e = (chunkId) => {
+/******/ 			return Promise.all(Object.keys(__webpack_require__.f).reduce((promises, key) => {
+/******/ 				__webpack_require__.f[key](chunkId, promises);
+/******/ 				return promises;
+/******/ 			}, []));
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/get javascript chunk filename */
+/******/ 	(() => {
+/******/ 		// This function allow to reference async chunks
+/******/ 		__webpack_require__.u = (chunkId) => {
+/******/ 			// return url for filenames based on template
+/******/ 			return "" + chunkId + ".js";
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop)
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/publicPath */
+/******/ 	(() => {
+/******/ 		__webpack_require__.p = "./lib/";
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/jsonp chunk loading */
+/******/ 	(() => {
+/******/ 		
+/******/ 		
+/******/ 		// object to store loaded and loading chunks
+/******/ 		// undefined = chunk not loaded, null = chunk preloaded/prefetched
+/******/ 		// Promise = chunk loading, 0 = chunk loaded
+/******/ 		var installedChunks = {
+/******/ 			"app": 0
+/******/ 		};
+/******/ 		
+/******/ 		
+/******/ 		
+/******/ 		
+/******/ 		__webpack_require__.f.j = (chunkId, promises) => {
+/******/ 				// JSONP chunk loading for javascript
+/******/ 				var installedChunkData = __webpack_require__.o(installedChunks, chunkId) ? installedChunks[chunkId] : undefined;
+/******/ 				if(installedChunkData !== 0) { // 0 means "already installed".
+/******/ 		
+/******/ 					// a Promise means "currently loading".
+/******/ 					if(installedChunkData) {
+/******/ 						promises.push(installedChunkData[2]);
+/******/ 					} else {
+/******/ 						if(true) { // all chunks have JS
+/******/ 							// setup Promise in chunk cache
+/******/ 							var promise = new Promise((resolve, reject) => {
+/******/ 								installedChunkData = installedChunks[chunkId] = [resolve, reject];
+/******/ 							});
+/******/ 							promises.push(installedChunkData[2] = promise);
+/******/ 		
+/******/ 							// start chunk loading
+/******/ 							var url = __webpack_require__.p + __webpack_require__.u(chunkId);
+/******/ 							var loadingEnded = () => {
+/******/ 								if(__webpack_require__.o(installedChunks, chunkId)) {
+/******/ 									installedChunkData = installedChunks[chunkId];
+/******/ 									if(installedChunkData !== 0) installedChunks[chunkId] = undefined;
+/******/ 									if(installedChunkData) return installedChunkData[1];
+/******/ 								}
+/******/ 							};
+/******/ 							var script = document.createElement('script');
+/******/ 							var onScriptComplete;
+/******/ 		
+/******/ 							script.charset = 'utf-8';
+/******/ 							script.timeout = 120;
+/******/ 							if (__webpack_require__.nc) {
+/******/ 								script.setAttribute("nonce", __webpack_require__.nc);
+/******/ 							}
+/******/ 							script.src = url;
+/******/ 		
+/******/ 							// create error before stack unwound to get useful stacktrace later
+/******/ 							var error = new Error();
+/******/ 							onScriptComplete = (event) => {
+/******/ 								onScriptComplete = () => {
+/******/ 		
+/******/ 								}
+/******/ 								// avoid mem leaks in IE.
+/******/ 								script.onerror = script.onload = null;
+/******/ 								clearTimeout(timeout);
+/******/ 								var reportError = loadingEnded();
+/******/ 								if(reportError) {
+/******/ 									var errorType = event && (event.type === 'load' ? 'missing' : event.type);
+/******/ 									var realSrc = event && event.target && event.target.src;
+/******/ 									error.message = 'Loading chunk ' + chunkId + ' failed.\n(' + errorType + ': ' + realSrc + ')';
+/******/ 									error.name = 'ChunkLoadError';
+/******/ 									error.type = errorType;
+/******/ 									error.request = realSrc;
+/******/ 									reportError(error);
+/******/ 								}
+/******/ 							}
+/******/ 							;
+/******/ 							var timeout = setTimeout(() => {
+/******/ 								onScriptComplete({ type: 'timeout', target: script })
+/******/ 							}, 120000);
+/******/ 							script.onerror = script.onload = onScriptComplete;
+/******/ 							document.head.appendChild(script);
+/******/ 						} else installedChunks[chunkId] = 0;
+/******/ 		
+/******/ 						// no HMR
+/******/ 					}
+/******/ 				}
+/******/ 		
+/******/ 				// no chunk preloading needed
+/******/ 		};
+/******/ 		
+/******/ 		// no prefetching
+/******/ 		
+/******/ 		// no HMR
+/******/ 		
+/******/ 		// no HMR manifest
+/******/ 		
+/******/ 		// no deferred startup or startup prefetching
+/******/ 		
+/******/ 		// install a JSONP callback for chunk loading
+/******/ 		function webpackJsonpCallback(data) {
+/******/ 			var chunkIds = data[0];
+/******/ 			var moreModules = data[1];
+/******/ 		
+/******/ 			var runtime = data[3];
+/******/ 		
+/******/ 			// add "moreModules" to the modules object,
+/******/ 			// then flag all "chunkIds" as loaded and fire callback
+/******/ 			var moduleId, chunkId, i = 0, resolves = [];
+/******/ 			for(;i < chunkIds.length; i++) {
+/******/ 				chunkId = chunkIds[i];
+/******/ 				if(__webpack_require__.o(installedChunks, chunkId) && installedChunks[chunkId]) {
+/******/ 					resolves.push(installedChunks[chunkId][0]);
+/******/ 				}
+/******/ 				installedChunks[chunkId] = 0;
+/******/ 			}
+/******/ 			for(moduleId in moreModules) {
+/******/ 				if(__webpack_require__.o(moreModules, moduleId)) {
+/******/ 					__webpack_require__.m[moduleId] = moreModules[moduleId];
+/******/ 				}
+/******/ 			}
+/******/ 			if(runtime) runtime(__webpack_require__);
+/******/ 			if(parentJsonpFunction) parentJsonpFunction(data);
+/******/ 		
+/******/ 			while(resolves.length) {
+/******/ 				resolves.shift()();
+/******/ 			}
+/******/ 		
+/******/ 		};
+/******/ 		
+/******/ 		var jsonpArray = window["webpackJsonp"] = window["webpackJsonp"] || [];
+/******/ 		var oldJsonpFunction = jsonpArray.push.bind(jsonpArray);
+/******/ 		jsonpArray.push = webpackJsonpCallback;
+/******/ 		
+/******/ 		var parentJsonpFunction = oldJsonpFunction;
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+/*!******************!*\
+  !*** ./index.js ***!
+  \******************/
+/*! unknown exports (runtime-defined) */
+/*! exports [maybe provided (runtime-defined)] [no usage info] */
+/*! runtime requirements: __webpack_require__.e, __webpack_require__, __webpack_require__.* */
+eval("__webpack_require__.e(/*! import() */ \"demo-publicpath_js\").then(__webpack_require__.bind(__webpack_require__, /*! ./demo-publicpath */ \"./demo-publicpath.js\")).then((demoPublicPath) => {\n    demoPublicPath.say();\n});\n\n//# sourceURL=webpack:///./index.js?");
+/******/ })()
+;
+```
+
+lib/demo-publicpath_js.js:
+
+```js
+(window["webpackJsonp"] = window["webpackJsonp"] || []).push([["demo-publicpath_js"],{
+
+/***/ "./demo-publicpath.js":
+/*!****************************!*\
+  !*** ./demo-publicpath.js ***!
+  \****************************/
+/*! namespace exports */
+/*! export say [provided] [no usage info] [missing usage info prevents renaming] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: __webpack_exports__, __webpack_require__.d, __webpack_require__.r, __webpack_require__.* */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpack_require__.d(__webpack_exports__, {\n/* harmony export */   \"say\": () => /* binding */ say\n/* harmony export */ });\nfunction say() {\n    document.body.append(document.createTextNode(\"hello webpack\"))\n}\n\n//# sourceURL=webpack:///./demo-publicpath.js?");
+
+/***/ })
+
+}]);
+```
+
+然后我们在根目录创建一个test.html文件用来测试，
+
+test.html：
+
+```js
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script src="./lib/app.js"></script>
+</body>
+</html>
+```
+
+我们到浏览器运行一下test.html，打开浏览器会发现报错信息：
+
+```markdown
+app.js:160 GET http://localhost:8080/webpack-demo/demo-publicpath_js.js 404 (Not Found)
+__webpack_require__.f.j @ app.js:160
+(anonymous) @ app.js:50
+__webpack_require__.e @ app.js:49
+eval @ index.js:1
+(anonymous) @ app.js:223
+(anonymous) @ app.js:224
+app.js:136 Uncaught (in promise) ChunkLoadError: Loading chunk demo-publicpath_js failed.
+(error: http://localhost:8080/webpack-demo/demo-publicpath_js.js)
+    at Object.__webpack_require__.f.j (http://localhost:8080/webpack-demo/lib/app.js:136:29)
+    at http://localhost:8080/webpack-demo/lib/app.js:50:40
+    at Array.reduce (<anonymous>)
+    at Function.__webpack_require__.e (http://localhost:8080/webpack-demo/lib/app.js:49:67)
+    at eval (webpack:///./index.js?:1:21)
+    at http://localhost:8080/webpack-demo/lib/app.js:223:1
+    at http://localhost:8080/webpack-demo/lib/app.js:224:12
+__webpack_require__.f.j @ app.js:136
+(anonymous) @ app.js:50
+__webpack_require__.e @ app.js:49
+eval @ index.js:1
+(anonymous) @ app.js:223
+(anonymous) @ app.js:224
+Promise.then (async)
+eval @ index.js:1
+(anonymous) @ app.js:223
+(anonymous) @ app.js:22
+```
+
+可以看到，默认去加载http://localhost:8080/webpack-demo/demo-publicpath_js.js文件，但是我们需要加载的是http://localhost:8080/webpack-demo/lib/demo-publicpath_js.js,少了个“lib”目录，所以我们修改一下publicPath让它默认加上lib目录，
+
+webpack.config.js:
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        publicPath: "./lib/"
+    }
+};
+```
+
+然后我们继续打包运行：
+
+![pub1](/Users/yinqingyang/前端架构系列之(webpack)/webpack-demo/pub1.png)
+
+可以看到，代码正常运行并且页面显示了预期结果。
+
+webpack在处理异步chunk的时候会动态的创建一个script标签，在上面打包完毕的app.js我们可以看到这么一段代码，
+
+lib/app.js:
+
+```js
+var script = document.createElement('script');
+/******/ 							var onScriptComplete;
+/******/ 		
+/******/ 							script.charset = 'utf-8';
+/******/ 							script.timeout = 120;
+/******/ 							if (__webpack_require__.nc) {
+/******/ 								script.setAttribute("nonce", __webpack_require__.nc);
+/******/ 							}
+/******/ 							script.src = url;
+/******/ 		
+/******/ 							// create error before stack unwound to get useful stacktrace later
+/******/ 							var error = new Error();
+/******/ 							onScriptComplete = (event) => {
+/******/ 								onScriptComplete = () => {
+/******/ 		
+/******/ 								}
+/******/ 								// avoid mem leaks in IE.
+/******/ 								script.onerror = script.onload = null;
+/******/ 								clearTimeout(timeout);
+/******/ 								var reportError = loadingEnded();
+/******/ 								if(reportError) {
+/******/ 									var errorType = event && (event.type === 'load' ? 'missing' : event.type);
+/******/ 									var realSrc = event && event.target && event.target.src;
+/******/ 									error.message = 'Loading chunk ' + chunkId + ' failed.\n(' + errorType + ': ' + realSrc + ')';
+/******/ 									error.name = 'ChunkLoadError';
+/******/ 									error.type = errorType;
+/******/ 									error.request = realSrc;
+/******/ 									reportError(error);
+/******/ 								}
+/******/ 							}
+/******/ 							;
+/******/ 							var timeout = setTimeout(() => {
+/******/ 								onScriptComplete({ type: 'timeout', target: script })
+/******/ 							}, 120000);
+/******/ 							script.onerror = script.onload = onScriptComplete;
+/******/ 							document.head.appendChild(script);
+```
+
+也就是动态创建了一个script标签用来异步加载demo-publicpath_js.js文件，但是scirpt标签的src是啥呢？
+
+```js
+url=publicPath+chunkPath;
+```
+
+因为`publicPath`默认为空字符串，所以转成script标签就为：
+
+```html
+<script src="demo-publicpath_js.js"></script>
+```
+
+这样是加载不到我们的demo-publicpath_js.js文件的，因为我们默认打包到lib目录了。
+
+所以当我们修改了`publicPath`为`./lib/`后，转成script标签就为：
+
+```html
+<script src="./lib/demo-publicpath_js.js"></script>
+```
+
+这样就能正常加载到了。
+
+当然，`publicPath`也可以为一个完整的cdn域名地址，比如：“http://localhost:8080/webpack-demo/lib/”，转成script标签就为：
+
+```html
+<script src="http://localhost:8080/webpack-demo/lib/demo-publicpath_js.js"></script>
+```
+
+在编译时(compile time)无法知道输出文件的 `publicPath` 的情况下，可以留空，然后在入口文件(entry file)处使用[自由变量(free variable)](https://stackoverflow.com/questions/12934929/what-are-free-variables) `__webpack_public_path__`，以便在运行时(runtime)进行动态设置。
+
+比如，我们去掉配置文件的publicPath配置，
+
+webpack.config.js:
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+    }
+};
+```
+
+然后在入口文件index.js中添加以下代码，
+
+src/index.js:
+
+```js
+__webpack_public_path__ = "http://localhost:8080/webpack-demo/lib/";
+import("./demo-publicpath").then((demoPublicPath) => {
+    demoPublicPath.say();
+});
+```
+
+我们编译打包然后运行test.html文件，会发现也是一样的结果，效果我就不截图演示了。
+
+#### filename
+
+`string` `function (pathData, assetInfo) => string`
+
+此选项决定了每个输出 bundle 的名称。这些 bundle 将写入到 [`output.path`](https://www.webpackjs.com/configuration/output/#output-path) 选项指定的目录下。
+
+默认为`[name].js`，`[name]`代表的就是chunk的名称，除了`name`外filename可选参数还可以为:
+
+以下就是所有的可选参数 (主要由webpack的[TemplatedPathPlugin`](https://github.com/webpack/webpack/blob/master/lib/TemplatedPathPlugin.js)插件实现):
+
+| Template           | Description                                                  |
+| :----------------- | :----------------------------------------------------------- |
+| [hash]             | 模块唯一标识符的hash值                                       |
+| [contenthash?:len] | the hash of the content of a file, which is different for each asset |
+| [chunkhash?:len]   | The hash of the chunk content                                |
+| [name]             | The module name                                              |
+| [id]               | The module identifier                                        |
+| [query]            | 跟在文件名“？”符号后面的字符串                               |
+| [function]         | The function, which can return filename [ string ]           |
+
+源码地址：lib/TemplatedPathPlugin.js
+
+我们修改一些配置文件，
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js"
+    }
+};
+```
+
+然后我们编译运行后会发现lib目录生成了两个文件:
+
+```diff
+app.d61bd5c5dcae317f.83aff0fe69484673.app.js
+demo-publicpath_js.d29ed06019743d38.83aff0fe69484673.demo-publicpath_js.js
+```
+
+那为什么`id`跟`name`是一样的值呢？ 因为我们使用的`mode`是“development”，webpack默认对id使用的是NamedModuleIdsPlugin插件（直接使用module的名称代替id），如果`mode`使用的是"production"的话webpack就会用HashedModuleIdsPlugin插件处理id，我们直接修改配置文件把`mode`改成“production”，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "production",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+    }
+};
+```
+
+然后我们编译运行后会发现lib目录生成了四个文件:
+
+```
+721.47800a7d336db006.4eae5adf4c890bf1.721.js
+721.47800a7d336db006.4eae5adf4c890bf1.721.js.LICENSE
+app.c0c0395ab8956721.4eae5adf4c890bf1.143.js
+app.c0c0395ab8956721.4eae5adf4c890bf1.143.js.LICENSE
+```
+
+可以看到，入口文件打包后是预期效果了，但是chunk的name跟id还是相同的，还是webpack默认配置的问题，当使用production的时候，为了防止chunk名称重复就直接把name换成了id。
+
+#### chunkFilename
+
+`string = '[id].js'`
+
+刚已经介绍过filename字段，filename会作用于chunk文件跟入口文件，如果需要单独设置chunk文件的名称的话，就可以使用chunkFilename字段，用法跟filename一样，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "production",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js" //默认配置
+    }
+};
+```
+
+打包后lib目录底下会有四个文件：
+
+```
+721.js
+721.js.LICENSE
+app.791277018b73acf2.1e4e0e1ed02ab7b6.143.js
+app.791277018b73acf2.1e4e0e1ed02ab7b6.143.js.LICENSE
+```
+
+#### assetModuleFilename
+
+跟 [`output.filename`](https://webpack.js.org/configuration/output/#outputfilename) 一样，但是是关于 [Asset Modules](https://webpack.js.org/guides/asset-modules/)的内容， [Asset Modules](https://webpack.js.org/guides/asset-modules/)就是我们在webpack处理文件模块，处理完的结果会放入到output.path目录，然后名称配置就是assetModuleFilename选项，比如可以设置为以下配置：
+
+```js
+assetModuleFilename: 'images/[hash][ext]'
+```
+
+每一个loader都会有自己单独的assetModuleFilename配置，如果没有就会用config的assetModuleFilename字段，默认为：
+
+```js
+assetModuleFilename: '[hash][ext]'
+```
+
+#### library
+
+`string` `object`
+
+> `string` 或 `object`（从 webpack 3.1.0 开始；用于 `libraryTarget: "umd"`）
+
+`output.library` 的值的作用，取决于[`output.libraryTarget`](https://www.webpackjs.com/configuration/output/#output-librarytarget) 选项的值；完整的详细信息请查阅该章节。注意，`output.libraryTarget` 的默认选项是 `var`，所以如果使用以下配置选项：
+
+```js
+output: {
+  library: "MyLibrary"
+}
+```
+
+如果生成的输出文件，是在 HTML 页面中作为一个 script 标签引入，则变量 `MyLibrary` 将与入口文件的返回值绑定。
+
+看官网的解释有点抽象，我们结合demo来分析，首先我们修改一下我们的配置文件，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        library: "demoSay",
+    }
+};
+```
+
+我们指定了`library: "demoSay",`然后我们执行编译看结果，
+
+lib/app.07ddaf5704298aa1.67ea617b36eb3365.app.js：
+
+```js
+var demoSay =
+/******/ (() => { // webpackBootstrap
+/******/ 	var __webpack_modules__ = ({
+  ....
+
+```
+
+代码有点多，我们直接运行test.html文件，
+
+test.html:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script src="./lib/app.07ddaf5704298aa1.67ea617b36eb3365.app.js"></script>
+</body>
+</html>
+```
+
+然后我们在浏览器调试窗打印一下demoSay：
+
+```js
+demoSay
+{}
+```
+
+可以看到，demoSay返回了一个空对象，是的！ 我们打开我们的入口文件index.js看看，
+
+src/index.js:
+
+```js
+__webpack_public_path__ = "http://localhost:8080/webpack-demo/lib/";
+import("./demo-publicpath").then((demoPublicPath) => {
+    demoPublicPath.say();
+});
+```
+
+我们直接执行了代码，并没有任何导出的内容，所以我们拿到的demoSay是一个空对象。
+
+我们修改一下index.js入口文件，让它默认导出一个demoSay方法，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        library: "demoSay",
+        libraryExport: "default",
+    }
+};
+```
+
+src/index.js:
+
+```js
+__webpack_public_path__ = "http://localhost:8080/webpack-demo/lib/";
+export default function demoSay() {
+    import("./demo-publicpath").then((demoPublicPath) => {
+        demoPublicPath.say();
+    });
+}
+```
+
+打包编译后lib目录下面文件：
+
+```
+app.054433abb6526c08.97d75e7a53c562f4.app.js
+demo-publicpath_js.js
+```
+
+修改test.html：
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script src="./lib/app.054433abb6526c08.97d75e7a53c562f4.app.js"></script>
+</body>
+</html>
+```
+
+运行test.html文件，然后打印并运行demoSay变量：
+
+```js
+demoSay
+ƒ demoSay() {
+    __webpack_require__.e(/*! import() */ "demo-publicpath_js").then(__webpack_require__.bind(__webpack_require__, /*! ./demo-publicpath */ "./demo-publicpath.js")).then((demoPublicPath) …
+demoSay();
+undefined
+```
+
+可以看到,这一次demoSay直接变成了我们入口文件中输出的demoSay方法，然后直接调用后页面上出现了“hello webpack”。
+
+#### libraryExport
+
+`string default to ""`
+
+细心的小伙伴已经发现了，我们在上面的demo中还加入了一个叫libraryExport的字段，然后我们给了一个“default”，也就是告诉webpack，默认导出对应模块的default变量。
+
+比如我们入口文件,
+
+src/index.js:
+
+```js
+__webpack_public_path__ = "http://localhost:8080/webpack-demo/lib/";
+export default function demoSay() {
+    import("./demo-publicpath").then((demoPublicPath) => {
+        demoPublicPath.say();
+    });
+}
+```
+
+我们默认导出模块的default变量，在这里也就是我们的demoSay方法，所以我们在运行的时候可以直接调用demoSay方法。
+
+#### libraryTarget
+
+`string  默认值： `"var"
+
+可以为：`"var" | "module" | "assign" | "this" | "window" | "self" | "global" | "commonjs" | "commonjs2" | "commonjs-module" | "amd" | "amd-require" | "umd" | "umd2" | "jsonp" | "system"`
+
+配置如何暴露 library。可以使用下面的选项中的任意一个。注意，此选项与分配给 [`output.library`](https://www.webpackjs.com/configuration/output/#output-library) 的值一同使用。
+
+上面我们已经演示过`var`了，也就是在全局暴露一个变量，然后变量名为library的配置值，
 

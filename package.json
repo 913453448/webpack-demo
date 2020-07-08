@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "webpack": "file:../webpack-src"
+    "webpack": "file:../../ThirdProject/webpack/webpack"
   },
   "dependencies": {
     "babel-polyfill": "^6.26.0"
