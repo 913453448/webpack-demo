@@ -1757,9 +1757,370 @@ export default function demoSay() {
 
 `string  默认值： `"var"
 
-可以为：`"var" | "module" | "assign" | "this" | "window" | "self" | "global" | "commonjs" | "commonjs2" | "commonjs-module" | "amd" | "amd-require" | "umd" | "umd2" | "jsonp" | "system"`
+webpack5.0中可以为：`"var" | "module" | "assign" | "this" | "window" | "self" | "global" | "commonjs" | "commonjs2" | "commonjs-module" | "amd" | "amd-require" | "umd" | "umd2" | "jsonp" | "system"`
 
 配置如何暴露 library。可以使用下面的选项中的任意一个。注意，此选项与分配给 [`output.library`](https://www.webpackjs.com/configuration/output/#output-library) 的值一同使用。
 
 上面我们已经演示过`var`了，也就是在全局暴露一个变量，然后变量名为library的配置值，
+
+##### module
+
+这个是webpack5特有的一个属性，需要跟另外一个叫[experiments](https://webpack.js.org/configuration/experiments/#experiments)属性的一起用，experiments就是还在实验中的一些特性（不建议开启[experiments](https://webpack.js.org/configuration/experiments/#experiments)的更多用法可以参考官网）。
+
+我们修改一下配置文件，webpack.config.js:
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        libraryTarget: "module",
+
+    },
+    experiments: {
+        outputModule: true
+    }
+};
+```
+
+我们把`libraryTarget`设置为了“module”，然后把`experiments.outputModule`设置为了“true”，然后我们执行打包命令看一下lib目录：
+
+app.4d52f6f40fbe4016.28aa8b97dd0f050f.app.js：
+
+```js
+/******/ "use strict";
+/******/ var __webpack_modules__ = ({
+
+/***/ "./index.js":
+/*!******************!*\
+  !*** ./index.js ***!
+  \******************/
+/*! export default [provided] [used] [missing usage info prevents renaming] */
+/*! other exports [not provided] [no usag
+...
+```
+
+demo-publicpath_js.js:
+
+```js
+(window["webpackJsonp"] = window["webpackJsonp"] || []).push([["demo-publicpath_js"],{
+
+/***/ "./demo-publicpath.js":
+/*!****************************!*\
+  !*** ./demo-publicpath.js ***!
+  \****************************/
+/*! export say [provided] [no usage info] [missing usage info prevents renaming] */
+/*! other exports [not provided] [no usage info] */
+/*! runtime requirements: __webpack_exports__, __webpack_require__.d, __webpack_require__.r, __webpack_require__.* */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpack_require__.d(__webpack_exports__, {\n/* harmony export */   \"say\": () => /* binding */ say\n/* harmony export */ });\nfunction say() {\n    document.body.append(document.createTextNode(\"hello webpack\"))\n}\n\n//# sourceURL=webpack:///./demo-publicpath.js?");
+
+/***/ })
+
+}]); 
+```
+
+那我们怎么用呢？
+
+我们修改一下我们的test.html文件：
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script src="./lib/app.c332dfffe553ed52.a7f098bb4c793dee.app.js"></script>
+<script>
+    var demoSay = __webpack_require__("./index.js").default;
+    demoSay();
+</script>
+</body>
+</html>
+```
+
+```js
+ var demoSay = __webpack_require__("./index.js").default;
+```
+
+就可以拿到demoSay方法了，然后调用demoSay方法就会在页面上看到“hello webpack”了。
+
+##### assign
+
+直接在全局环境中暴露一个未申明的变量“demoSay”，js中可以当全局变量访问，所以是可以直接执行的：
+
+```js
+demoSay()
+```
+
+##### this
+
+直接在this上面绑定一个变量“demoSay”,浏览器中this代表window的意思，所以我们也是可以在全局环境中访问demoSay方法。
+
+```js
+this["demoSay"] =xxx
+```
+
+`window`、`self`、`global`都是一样的操作，在浏览器环境中都代表window，我们也是可以在全局环境中访问demoSay方法。
+
+##### jsonp
+
+通过jsonp的形式来导出当前模块，我们修改一下配置文件，把libraryTarget改成“jsonp”,
+
+webpack.config.js:
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: "./index.js"
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        library: "demoSay",
+        libraryExport: "default",
+        libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    }
+};
+```
+
+然后我们打包后在html中引入打包完毕的js文件，最后window对象上面注册一个demoSay方法用来作为jsonp的回调函数，
+
+test.html：
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+    function demoSay(module) {
+        module();
+    }
+</script>
+<script src="./lib/app.f366a0d04be496a3.312b7fd4a12f5d79.app.js"></script>
+</body>
+</html>
+```
+
+ok～ 运行是可以正常显示的，我就不截图了，小伙伴自己一定要去跑跑代码哦。
+
+#### 其它配置
+
+output的其它一些配置大家可以自己去参考官网跑一下demo（不过我们基本项目中也用不到），这里就不分析了。
+
+### Module
+
+这些选项决定了如何处理项目中的[不同类型的模块](https://www.webpackjs.com/concepts/modules)。
+
+#### rules
+
+`array`
+
+创建模块时，匹配请求的[规则](https://www.webpackjs.com/configuration/module/#rule)数组。这些规则能够修改模块的创建方式。这些规则能够对模块(module)应用 loader，或者修改解析器(parser)。
+
+##### noParse
+
+`regExp | [RegExp]`
+
+`RegExp | [RegExp] | function`（从 webpack 3.0.0 开始）
+
+防止 webpack 解析那些任何与给定正则表达式相匹配的文件。忽略的文件中**不应该含有** `import`, `require`, `define` 的调用，或任何其他导入机制。忽略大型的 library 可以提高构建性能。
+
+```js
+noParse: /jquery|lodash/
+
+// 从 webpack 3.0.0 开始
+noParse: function(content) {
+  return /jquery|lodash/.test(content);
+}
+```
+
+怎么理解呢？比如我们demo中前面讲entry的时候，我们导入了一个叫“babel-polyfill”的babel垫片，其实我们当成module导入的时候，webpack会去分析babel-polyfill的模块依赖，是会影响编译速度的，所以我们改一下配置文件，让它默认不去解析babel-polyfill，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["babel-polyfill","./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        library: "demoSay",
+        libraryExport: "default",
+        libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/
+    }
+};
+```
+
+然后我们编译运行webpack看结果，
+
+Lib/app.c2906c554fe563aa.9660e03dcc700539.app.js:
+
+```js
+demoSay(/******/ (() => { // webpackBootstrap
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "../node_modules/babel-polyfill/lib/index.js":
+/*!***************************************************!*\
+  !*** ../node_modules/babel-polyfill/lib/index.js ***!
+  \***************************************************/
+/*! exports [maybe provided (runtime-defined)] [no usage info] */
+/*! runtime requirements: module, __webpack_exports__, top-level-this-exports */
+/***/ (function(module, exports) {
+
+eval("\"use strict\";\n\nrequire(\"core-js/shim\");\n\nrequire(\"regenerator-runtime/runtime\");\n\nrequire(\"core-js/fn/regexp/escape\");\n\nif (global._babelPolyfill) {\n  throw new Error(\"only one instance of babel-polyfill is allowed\");\n}\nglobal._babelPolyfill = true;\n\nvar DEFINE_PROPERTY = \"defineProperty\";\nfunction define(O, key, value) {\n  O[key] || Object[DEFINE_PROPERTY](O, key, {\n    writable: true,\n    configurable: true,\n    value: value\n  });\n}\n\ndefine(String.prototype, \"padLeft\", \"\".padStart);\ndefine(String.prototype, \"padRight\", \"\".padEnd);\n\n\"pop,reverse,shift,keys,values,entries,indexOf,every,some,forEach,map,filter,find,findIndex,includes,join,slice,concat,push,splice,unshift,sort,lastIndexOf,reduce,reduceRight,copyWithin,fill\".split(\",\").forEach(function (key) {\n  [][key] && define(Array, key, Function.call.bind([][key]));\n});\n\n//# sourceURL=webpack://demoSay/../node_modules/babel-polyfill/lib/index.js?");
+..
+```
+
+可以看到，webpack设置了noParse后就不会再去分析babel-polifill的模块依赖，直接把babel-polyfill/lib/index.js中的源文件给导入进来了，
+
+node_modules/babel-polyfill/lib/index.js:
+
+```js
+"use strict";
+
+require("core-js/shim");
+
+require("regenerator-runtime/runtime");
+
+require("core-js/fn/regexp/escape");
+
+if (global._babelPolyfill) {
+  throw new Error("only one instance of babel-polyfill is allowed");
+}
+global._babelPolyfill = true;
+
+var DEFINE_PROPERTY = "defineProperty";
+function define(O, key, value) {
+  O[key] || Object[DEFINE_PROPERTY](O, key, {
+    writable: true,
+    configurable: true,
+    value: value
+  });
+}
+
+define(String.prototype, "padLeft", "".padStart);
+define(String.prototype, "padRight", "".padEnd);
+
+"pop,reverse,shift,keys,values,entries,indexOf,every,some,forEach,map,filter,find,findIndex,includes,join,slice,concat,push,splice,unshift,sort,lastIndexOf,reduce,reduceRight,copyWithin,fill".split(",").forEach(function (key) {
+  [][key] && define(Array, key, Function.call.bind([][key]));
+});
+```
+
+这样在浏览器直接运行肯定是不行的，运行test.html:
+
+```js
+Navigated to http://localhost:8091/webpack-demo/test.html?_ijt=953ti63cuqmunn4c0eih81htnn
+index.js:3 Uncaught ReferenceError: require is not defined
+    at eval (index.js:3)
+    at Object.../node_modules/babel-polyfill/lib/index.js (app.c2906c554fe563aa.9660e03dcc700539.app.js:12)
+    at __webpack_require__ (app.c2906c554fe563aa.9660e03dcc700539.app.js:49)
+    at app.c2906c554fe563aa.9660e03dcc700539.app.js:244
+    at app.c2906c554fe563aa.9660e03dcc700539.app.js:246
+eval @ index.js:3
+../node_modules/babel-polyfill/lib/index.js @ app.c2906c554fe563aa.9660e03dcc700539.app.js:12
+__webpack_require__ @ app.c2906c554fe563aa.9660e03dcc700539.app.js:49
+(anonymous) @ app.c2906c554fe563aa.9660e03dcc700539.app.js:244
+(anonymous) @ app.c2906c554fe563aa.9660e03dcc700539.app.js:246
+```
+
+可以看到，直接报错了，因为我们导入的是babel-polyfill未打包完成的入口，我们改成打包好的依赖，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["babel-polyfill/dist/polyfill.min.js","./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        library: "demoSay",
+        libraryExport: "default",
+        libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/
+    }
+};
+```
+
+再次打包运行看结果，
+
+lib/app.9e96cc5a4f61983c.e21638e08b6f3396.app.js:
+
+```js
+demoSay(/******/ (() => { // webpackBootstrap
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "../node_modules/babel-polyfill/dist/polyfill.min.js":
+/*!***********************************************************!*\
+  !*** ../node_modules/babel-polyfill/dist/polyfill.min.js ***!
+  \***********************************************************/
+/*! exports [maybe provided (runtime-defined)] [no usage info] */
+/*! runtime requirements: module, __webpack_exports__, top-level-this-exports */
+/***/ (function(module, exports) {
+
+eval("!function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var c=\"function\"==typeof require&&require;if(!u&&c)return c(o,!0);if(i)return i(o,!0);var a=new Error(\"Cannot find module '\"+o+\"'\");throw a.code=\"MODULE_NOT_FOUND\",a}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(n){var r=t[o][1][n];return s(r||n)},f,f.exports,e,t,n,r)}return n[o].exports}for(var i=\"function\"==typeof require&&require,o=0;o<r.length;o++)s(r[o]);return s}({1:[function(t,n,r){(function(n){\"use strict\";function define(t,n,e){t[n]||Object[r](t,n,{writable:!0,configurable:!0,value:e})}if(t(327),t(328),t(2),n._babelPolyfill)throw new Error(\"only one instance of babel-polyfill is allowed\");n._babelPolyfill=!0;var r=\"defineProperty\";define(String.prototype,\"padLeft\",\"\".padStart),define(String.prototype,\"padRight\",\"\".padEnd),\"pop,reverse,shift,keys,values,entries,indexOf,every,some,forEach,map,filter,find,findIndex,includes,join,slice,concat,push,splice,unshift,sort,lastIndexOf,reduce,reduceRight,copyWithin,fill\".split(\",\").forEach(function(t){[][t]&&define(Array,t,Function.call.bind([][t]))})}).call(this,\"undefined\"!=typeof global?global:\"undefined\"!=typeof self?self:\"undefined\"!=typeof window?window:{})},{2:2,327:327,328:328}],2:[function(t,n,r){t(130),n.exports=t(23).RegExp.escape},{130:130,23:23}],3:[function(t,n,r){n.exports=function(t){if(\"function\"!=typeof t)throw TypeError(t+\" is not a function!\");return t}},{}],4:[function(t,n,r){var e=t(18);n.exports=function(t,n){if(\"number\"!=typeof t&&\"Number\"!=e(t))throw TypeError(n);return+t}},{18:18}],5:[function(t,n,r){var e=t(128)(\"unscopables\"),i=Array.prototype;void 0==i[e]&&t(42)(i,e,{}),n.exports=function(t){i[e][t]=!0}},{128:128,42:42}],6:[function(t,n,r){n.exports=function(t,n,r,e){if(!(t instanceof n)||void 0!==e&&e in t)throw TypeError(r+\": incorrect invocation!\");return t}},{}],7:[function(t,n,r){var e=t(51);n.exports=function(t){if(!e(t))throw TypeError(t+\" is not an object!\");return t}},{51:51}],8:[function(t,n,r){\"use strict\";var e=t(119),i=t(114),o=t(118);n.exports=[].copyWithin||function copyWithin(t,n){var r=e(this),u=o(r.length),c=i(t,u),a=i(n,u),f=arguments.length>2?arguments[2]:void 0,s=Math.min((void 0===f?u:i(f,u))-a,u-c),l=1;for(a<c&&c<a+s&&(l=-1,a+=s-1,c+=s-1);s-- >0;)
+     ...
+```
+
+可以看到，直接把babel-polyfill打包好的源码给导入进来了，这次我们就可以在浏览器中正常运行test.html文件了。
+
+##### Rule
 
