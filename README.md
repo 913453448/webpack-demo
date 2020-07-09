@@ -2124,3 +2124,1232 @@ eval("!function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var c=\"function\"=
 
 ##### Rule
 
+每个规则可以分为三部分 - 条件(condition)，结果(result)和嵌套规则(nested rule)。
+
+###### Rule 条件
+
+条件有两种输入值：
+
+1. resource：请求文件的绝对路径。它已经根据 [`resolve` 规则](https://www.webpackjs.com/configuration/resolve)解析。
+2. issuer: 被请求资源(requested the resource)的模块文件的绝对路径。是导入时的位置。
+
+**例如:** 从 `app.js` `导入 './style.css'`，resource 是 `/path/to/style.css`. issuer 是 `/path/to/app.js`。
+
+在规则中，属性 [`test`](https://www.webpackjs.com/configuration/module/#rule-test), [`include`](https://www.webpackjs.com/configuration/module/#rule-include), [`exclude`](https://www.webpackjs.com/configuration/module/#rule-exclude) 和 [`resource`](https://www.webpackjs.com/configuration/module/#rule-resource) 对 resource 匹配，并且属性 [`issuer`](https://www.webpackjs.com/configuration/module/#rule-issuer) 对 issuer 匹配。
+
+当使用多个条件时，所有条件都匹配。
+
+> 小心！resource 是文件的_解析*路径，这意味着符号链接的资源是真正的路径，*而不是_符号链接位置。在使用工具来符号链接包的时候（如 `npm link`）比较好记，像 `/node_modules/` 等常见条件可能会不小心错过符号链接的文件。注意，可以通过 [`resolve.symlinks`](https://www.webpackjs.com/configuration/resolve#resolve-symlinks) 关闭符号链接解析（以便将资源解析为符号链接路径）。
+
+###### Rule 结果
+
+规则结果只在规则条件匹配时使用。
+
+规则有两种输入值：
+
+1. 应用的 loader：应用在 resource 上的 loader 数组。
+2. Parser 选项：用于为模块创建解析器的选项对象。
+
+这些属性会影响 loader：[`loader`](https://www.webpackjs.com/configuration/module/#rule-loader), [`options`](https://www.webpackjs.com/configuration/module/#rule-options-rule-query), [`use`](https://www.webpackjs.com/configuration/module/#rule-use)。
+
+也兼容这些属性：[`query`](https://www.webpackjs.com/configuration/module/#rule-options-rule-query), [`loaders`](https://www.webpackjs.com/configuration/module/#rule-loaders)。
+
+[`enforce`](https://www.webpackjs.com/configuration/module/#rule-enforce) 属性会影响 loader 种类。不论是普通的，前置的，后置的 loader。
+
+[`parser`](https://www.webpackjs.com/configuration/module/#rule-parser) 属性会影响 parser 选项。
+
+###### 嵌套的 Rule
+
+可以使用属性 [`rules`](https://www.webpackjs.com/configuration/module/#rule-rules) 和 [`oneOf`](https://www.webpackjs.com/configuration/module/#rule-oneof) 指定嵌套规则。
+
+这些规则用于在规则条件(rule condition)匹配时进行取值。
+
+------
+
+以上内容都是官网直接copy过来的，理解起来比较抽象，我们直接用demo来分析一下，我们从0开始搭建一个简单的vue项目：**webpack+vue+sass**
+
+首先我们在src目录底下创建一个demo-vue.vue文件，
+
+src/demo-vue.vue:
+
+```vue
+<template>
+<div class="demo-vue">hello fox</div>
+</template>
+<script>
+    export default {
+        name: 'demo-vue',
+    };
+</script>
+<style lang='scss' scoped>
+.demo-vue{
+	color: red;
+}
+</style>
+
+```
+
+然后修改一下我们的入口文件index.js，
+
+src/index.js:
+
+```js
+__webpack_public_path__ = "http://localhost:8091/webpack-demo/lib/";
+import demoVue from "./demo-vue.vue";
+import Vue from "vue";
+new Vue({
+    el: "#app",
+    render:(h)=>h(demoVue)
+});
+```
+
+代码很简单，稍微有点vue基础的应该是没啥问题的，看不懂的也没关系，我们继续往下分析rule参数。
+
+###### enforce
+
+`string 可能的值有：`"pre" | "post"`` 
+
+所有 loader 通过 `前置, 行内, 普通, 后置` 排序，并按此顺序使用。
+
+普通的loader是从下往上使用。
+
+比如我们demo中需要处理scss样式语法：
+
+```scss
+<style lang='scss' scoped>
+.demo-vue{
+	color: red;
+}
+</style>
+```
+
+所以我们需要去配置一下scss解析器，在配置之前我们需要安装一些依赖，
+
+处理vue文件：
+
+vue 、vue-loader、vue-loader-plugin、vue-template-compiler  `
+
+```js
+npm install -S vue && npm install -D vue-loader && npm install -D vue-loader-plugin && npm 
+install -D vue-template-compiler
+```
+
+处理scss文件：
+
+`sass、sass-loader、postcss-loader、autoprefixer、css-loader、style-loader`
+
+大家一样安装一遍，别漏了，我就不演示了。
+
+webpack在处理scss的时候顺序应该是这样的：
+
+1. vue-loader 负责解析vue模版中的style标签中的scss内容。
+2. sass-loader 负责解析scss为css。
+3. postcss-loader 对css做优化处理（这里用到了自动添加前缀的插件autoprefixer）。
+4. css-loader负责把处理完毕的css代码变成一个module。
+5. style-loader获取css-loader处理过后的module，然后把动态创建style标签加载module内容。
+
+所以我们修改一些我们的webpack配置文件，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/,
+        rules: [
+            {
+                test: /.vue$/,
+                use: 'vue-loader',
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "postcss-loader",
+                        options: {
+                            ident: "postcss",
+                            config: {
+                                path: path.resolve(__dirname,"./postcss.config.js")
+                            }
+                        }
+                    },
+                    "sass-loader"
+                ]
+            }
+        ]
+    },
+    plugins: [
+        new (require("vue-loader-plugin"))()
+    ]
+};
+```
+
+因为postcss需要指定一个配置文件，所以我们在根目录指定一个postcss.config.js文件作为postcss-loader的参数，
+
+postcss.config.js：
+
+```js
+module.exports={
+    plugins:[
+        require('autoprefixer')(),
+    ]
+};
+```
+
+autoprefixer又需要根据你浏览器的定义做前缀添加，所以我们在根目录创建一个.browserslistrc文件给autoprefixer插件，
+
+.browserslistrc：
+
+```js
+> 0.25%, not dead
+```
+
+我们在讲babel的时候也提到了.browserslistrc文件，所以这里我就不分析了。
+
+可以看到上面的配置文件，我们配置了一个.vue文件的loader “vue-loader”，然后配置了很多个loader来处理.scss文件.
+
+我们运行一下webpack：
+
+```js
+➜  webpack-demo git:(master) ✗ npx webpack
+Hash: 01d4acbf09e4ec864dc8
+Version: webpack 5.0.0-beta.7
+Time: 2076ms
+Built at: 2020-07-09 14:04:46
+1 asset
+Entrypoint app = app.cb21e253f621ffc6.01d4acbf09e4ec86.app.js
+./index.js 186 bytes [built]
+./demo-vue.vue 1.19 KiB [built]
+../node_modules/vue/dist/vue.runtime.esm.js 222 KiB [built]
+./demo-vue.vue?vue&type=template&id=47a7e22a&scoped=true& 212 bytes [built]
+./demo-vue.vue?vue&type=script&lang=js& 258 bytes [built]
+./demo-vue.vue?vue&type=style&index=0&id=47a7e22a&lang=scss&scoped=true& 824 bytes [built]
+../node_modules/vue-loader/lib/runtime/componentNormalizer.js 2.71 KiB [built]
+../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../node_modules/vue-loader/lib??vue-loader-options!./demo-vue.vue?vue&type=template&id=47a7e22a&scoped=true& 264 bytes [built]
+../node_modules/vue-loader/lib??vue-loader-options!./demo-vue.vue?vue&type=script&lang=js& 52 bytes [built]
+../node_modules/style-loader/dist/cjs.js!../node_modules/css-loader/dist/cjs.js!../node_modules/vue-loader/lib/loaders/stylePostLoader.js!../node_modules/postcss-loader/src??ruleSet[0].rules[0].use[2]!../node_modules/sass-loader/dist/cjs.js!../node_modules/vue-loader/lib??vue-loader-options!./demo-vue.vue?vue&type=style&index=0&id=47a7e22a&lang=scss&scoped=true& 810 bytes [built]
+../node_modules/style-loader/dist/runtime/injectStylesIntoStyleTag.js 6.64 KiB [built]
+../node_modules/css-loader/dist/cjs.js!../node_modules/vue-loader/lib/loaders/stylePostLoader.js!../node_modules/postcss-loader/src??ruleSet[0].rules[0].use[2]!../node_modules/sass-loader/dist/cjs.js!../node_modules/vue-loader/lib??vue-loader-options!./demo-vue.vue?vue&type=style&index=0&id=47a7e22a&lang=scss&scoped=true& 278 bytes [built]
+../node_modules/css-loader/dist/runtime/api.js 2.46 KiB [built]
+    + 5 hidden modules
+➜  webpack-demo git:(master) ✗ 
+
+```
+
+再看一下生成的文件lib/*：
+
+lib/app.cb21e253f621ffc6.01d4acbf09e4ec86.app.js:
+
+```js
+/******/ (() => { // webpackBootstrap
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "../node_modules/css-loader/dist/cjs.js!../node_modules/vue-loader/lib/loaders/stylePostLoader.js!../node_modules/postcss-loader/src/index.js??ruleSet[0].rules[0].use[2]!../node_modules/sass-loader/dist/cjs.js!../node_modules/vue-loader/lib/index.js??vue-loader-options!./demo-vue.vue?vue&type=style&index=0&id=47a7e22a&lang=scss&scoped=true&":
+/*!*******************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** ../node_modules/css-loader/dist/cjs.js!../node_modules/vue-loader/lib/loaders/stylePostLoader.js!../node_modules/postcss-loader/src??ruleSet[0].rules[0].use[2]!../node_modules/sass-loader/dist/cjs.js!../node_modules/vue-loader/lib??vue-loader-options!./demo-vue.vue?vue&type=style&index=0&id=47a7e22a&lang=scss&scoped=true& ***!
+  \*******************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*! exports [maybe provided (runtime-defined)] [no usage info] */
+/*! runtime requirements: __webpack_require__, __webpack_exports__, module */
+/***/ ((module, exports, __webpack_require__) => {
+  ...
+```
+
+代码有点多，而且很难看懂，我们还是在我们的test.html中引用试试，
+
+test.html:
+
+```js
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div id="app"></div>
+<script src="./lib/app.cb21e253f621ffc6.01d4acbf09e4ec86.app.js"></script>
+</body>
+</html>
+```
+
+然后运行浏览器：
+
+![demo-vue](/Users/ocj1/doc/h5/study/webpack/webpack-demo/demo-vue.png)
+
+可以看到，页面上已经显示了我们的“hello fox”并且scss样式也是起作用了，style-loader会在我们的html文件中插入以下代码：
+
+```html
+<style>.demo-vue[data-v-47a7e22a] {
+  color: red;
+}</style>
+```
+
+ok! 代码也讲完了，还是没讲到`enforce`的用法，demo的webpack配置中我们处理scss文件的时候用的rule配置是这样的：
+
+```js
+{
+                test: /\.(sass|scss)$/,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "postcss-loader",
+                        options: {
+                            ident: "postcss",
+                            config: {
+                                path: path.resolve(__dirname,"./postcss.config.js")
+                            }
+                        }
+                    },
+                    "sass-loader"
+                ]
+            }
+```
+
+webpack默认顺序是（从下往上）: 
+
+`vue-loader-->sass-loader-->postcss-loader-->css-loader-->style-loader` 
+
+那如果我们需要改变它的默认顺序我们该怎么做呢？
+
+我们给sass-loader加一个`enforce`选项“pre”，让sass-loader第一个执行，
+
+webpack.config.js:
+
+```js
+{
+                test: /\.(sass|scss)$/,
+                enforce: "pre",
+                use: "sass-loader",
+            },
+```
+
+运行后会发现报错：
+
+```js
+ERROR in ./demo-vue.vue?vue&type=style&index=0&id=47a7e22a&lang=scss&scoped=true& (../node_modules/css-loader/dist/cjs.js!../node_modules/vue-loader/lib/loaders/stylePostLoader.js!../node_modules/postcss-loader/src??ruleSet[0].rules[0].use!../node_modules/vue-loader/lib??vue-loader-options!../node_modules/sass-loader/dist/cjs.js!./demo-vue.vue?vue&type=style&index=0&id=47a7e22a&lang=scss&scoped=true&)
+Module build failed (from ../node_modules/sass-loader/dist/cjs.js):
+SassError: expected "{".
+   ╷
+13 │ </style>
+
+```
+
+我们可以利用enforce修改一下loader的默认加载顺序。
+
+###### exclude
+
+`string、array、function`
+
+哪些模块不需要被加载，如果你提供了 `Rule.exclude` 选项，就不能再提供 `Rule.resource`。
+
+比如我们demo中sass-loader只加载.sass或.scss文件,我们就可以这样配置：
+
+```js
+ {
+                exclude: (info)=>{
+                    return !/\.(sass|scss)$/.test(info);
+                },
+                use: "sass-loader",
+            },
+```
+
+###### include
+
+string、array、function
+
+跟exclude相反的操作，比如上面的配置我们可以用include这样来：
+
+```js
+  {
+                include: (info)=>{
+                    return /\.(sass|scss)$/.test(info);
+                },
+                use: "sass-loader",
+            },
+```
+
+###### Issuer
+
+规定了哪个文件发起的request才需要被loader，比如我们这里的scss是由demo-vue.vue文件发起的，所以可以用Issuer来设置只有当demo-vue.vue文件发起的.scss模块才解析：
+
+```js
+ {
+                issuer: (info)=>{
+                    return /\.(sass|scss)$/.test(info)&&!/demo-vue\.vue/.test(info);
+                },
+                use: "sass-loader",
+            },
+```
+
+###### loader
+
+`Rule.loader` 是 `Rule.use: [ { loader } ]` 的简写。详细请查看 [`Rule.use`](https://www.webpackjs.com/configuration/module/#rule-use) 和 [`UseEntry.loader`](https://www.webpackjs.com/configuration/module/#useentry)。
+
+###### oneOf
+
+当规则匹配时，只使用第一个匹配规则。
+
+```javascript
+{
+  test: /.png/,
+  oneOf: [
+    {
+      resourceQuery: /inline/, // pub1.png?inline
+      use: 'url-loader'
+    },
+    {
+      resourceQuery: /external/, // pub1.png?external
+      use: 'file-loader'
+    }
+  ]
+}
+```
+
+我们试一下，比如我们需要加载一张图片，demo根目录下的，pub1.png图片，首先我们安装一下url-loader跟file-loader：
+
+- file-loader (会在output.path目录生成一个文件，返回这个文件的引用地址给调用处) 
+- url-loader（文件size小于limit的话就直接把文件打成base64格式字符串，大于则用file-loader）
+
+```
+npm install -D url-loader && npm install -D file-loader
+```
+
+然后我们修改一下我们的demo-vue.vue文件，添加一个图片，
+
+demo-vue.vue：
+
+```vue
+<template>
+<div class="demo-vue">
+    hello fox
+    <img :src="pubImg">
+</div>
+</template>
+
+<script>
+    export default {
+        name: 'demo-vue',
+        data(){
+            return {
+                pubImg: require("../pub1.png?external").default
+            }
+        }
+    };
+</script>
+<style lang='scss' scoped>
+.demo-vue{
+	color: red;
+}
+</style>
+
+```
+
+可以看到，我们用require加载了一张图片，然后给图片加了一个external后缀，然后我们配置一下webpack的配置文件，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/,
+        rules: [
+            {
+                test: /.vue$/,
+                use: 'vue-loader',
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: "style-loader",
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: "css-loader",
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: {
+                    loader: "postcss-loader",
+                    options: {
+                        config: {
+                            path: path.resolve(__dirname,"./postcss.config.js")
+                        }
+                    }
+                },
+            },
+            {
+                issuer: (info)=>{
+                    return /\.(sass|scss)$/.test(info)&&!/demo-vue\.vue/.test(info);
+                },
+                use: "sass-loader",
+            },
+            {
+                test: /\.png$/,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        loader: "url-loader",
+                        options: {
+                            limit: 1024*1024*10
+                        }
+                    },
+                    {
+                        resourceQuery: /external/,
+                        loader: "file-loader",
+                    }
+                ]
+            }
+        ]
+    },
+    plugins: [
+        new (require("vue-loader-plugin"))()
+    ]
+};
+```
+
+可以看到我们配置了两个loader，当图片指定了“inline”后缀就用url-loader，指定了“external”就使用file-loader。
+
+上面demo我们指定的是“external”，也就是说会以原文件的形式输出到output.path目录，
+
+我们运行webpack打包：
+
+```js
+63fe41824cb8236c0896a71b7df7f461.png
+app.f18f2f6646d5afa5.3be9121297511f01.app.js
+```
+
+可以看到，生成了两个文件，我们运行一下test.html文件，
+
+test.html:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div id="app"></div>
+<script src="./lib/app.f18f2f6646d5afa5.3be9121297511f01.app.js"></script>
+</body>
+</html>
+```
+
+![oneof_result](/Users/ocj1/doc/h5/study/webpack/webpack-demo/oneof_result.png)
+
+
+
+Ok！ 我们已经看到效果了，inline我就不测试了，小伙伴自己试试哦！
+
+###### resource
+
+[`条件`](https://www.webpackjs.com/configuration/module/#条件)会匹配 resource。既可以提供 `Rule.resource` 选项，也可以使用快捷选项 `Rule.test`，`Rule.exclude` 和 `Rule.include`。在 [`Rule` 条件](https://www.webpackjs.com/configuration/module/#rule-conditions) 中查看详细。
+
+###### resourceQuery
+
+[`条件`](https://www.webpackjs.com/configuration/module/#条件)会匹配 resourceQuery，请求资源的参数，上面在使用file-loader跟url-loader的时候使用过，就不演示了，比如：
+
+```js
+require("../pub1.png?external").default
+```
+
+external就是resourceQuery一部分，告诉webpack带有这个参数的时候才会用当前loader。
+
+###### rules
+
+[`规则`](https://www.webpackjs.com/configuration/module/#rule)数组，当规则匹配时使用。
+
+###### test
+
+如果你提供了一个 `Rule.test` 选项，就不能再提供 `Rule.resource`。详细请查看 [`Rule.resource`](https://www.webpackjs.com/configuration/module/#rule-resource) 和 [`Condition.test`](https://www.webpackjs.com/configuration/module/#条件)，跟include一样，利用正则表达式test判断，返回true才会用当前loader。
+
+###### use
+
+应用于模块的 [UseEntries](https://www.webpackjs.com/configuration/module/#useentry) 列表。每个入口(entry)指定使用一个 loader。
+
+传递字符串（如：`use: [ "style-loader" ]`）是 loader 属性的简写方式（如：`use: [ { loader: "style-loader "} ]`）。
+
+比如我们demo现在的配置文件为，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/,
+        rules: [
+            {
+                test: /.vue$/,
+                use: 'vue-loader',
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: "style-loader",
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: "css-loader",
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: {
+                    loader: "postcss-loader",
+                    options: {
+                        config: {
+                            path: path.resolve(__dirname,"./postcss.config.js")
+                        }
+                    }
+                },
+            },
+            {
+                issuer: (info)=>{
+                    return /\.(sass|scss)$/.test(info)&&!/demo-vue\.vue/.test(info);
+                },
+                use: "sass-loader",
+            },
+            {
+                test: /\.png$/,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        loader: "url-loader",
+                        options: {
+                            limit: 1024*1024*10
+                        }
+                    },
+                    {
+                        resourceQuery: /external/,
+                        loader: "file-loader",
+                    }
+                ]
+            }
+        ]
+    },
+    plugins: [
+        new (require("vue-loader-plugin"))()
+    ]
+};
+```
+
+我们对.scss文件的匹配用了很多loader，但是这些loader争对的都是.scss文件，所以我们可以利用use合并这些loader，
+
+webpack.config.js:
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/,
+        rules: [
+            {
+                test: /.vue$/,
+                use: 'vue-loader',
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "postcss-loader",
+                        options: {
+                            config: {
+                                path: path.resolve(__dirname,"./postcss.config.js")
+                            }
+                        }
+                    },
+                    "sass-loader"
+                ],
+            },
+            {
+                test: /\.png$/,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        loader: "url-loader",
+                        options: {
+                            limit: 1024*1024*10
+                        }
+                    },
+                    {
+                        resourceQuery: /external/,
+                        loader: "file-loader",
+                    }
+                ]
+            }
+        ]
+    },
+    plugins: [
+        new (require("vue-loader-plugin"))()
+    ]
+};
+```
+
+ok! 效果是一样的，我就不演示了。
+
+###### 条件
+
+条件可以是这些之一：
+
+- 字符串：匹配输入必须以提供的字符串开始。是的。目录绝对路径或文件绝对路径。
+- 正则表达式：test 输入值。
+- 函数：调用输入的函数，必须返回一个真值(truthy value)以匹配。
+- 条件数组：至少一个匹配条件。
+- 对象：匹配所有属性。每个属性都有一个定义行为。
+
+`{ test: Condition }`：匹配特定条件。一般是提供一个正则表达式或正则表达式的数组，但这不是强制的。
+
+`{ include: Condition }`：匹配特定条件。一般是提供一个字符串或者字符串数组，但这不是强制的。
+
+`{ exclude: Condition }`：排除特定条件。一般是提供一个字符串或字符串数组，但这不是强制的。
+
+`{ and: [Condition] }`：必须匹配数组中的所有条件
+
+`{ or: [Condition] }`：匹配数组中任何一个条件
+
+`{ not: [Condition] }`：必须排除这个条件
+
+**示例:**
+
+```js
+{
+  test: /\.css$/,
+  include: [
+    path.resolve(__dirname, "app/styles"),
+    path.resolve(__dirname, "vendor/styles")
+  ]
+}
+```
+
+### Resolve
+
+`object`
+
+配置模块如何解析。例如，当在 ES2015 中调用 `import "lodash"`，`resolve` 选项能够对 webpack 查找 `"lodash"` 的方式去做修改。
+
+------
+
+以上是官方的介绍，其实webpack在解析代码的时候回去加载模块（也就是读取文件），那么我们在node中读取文件路径可以用path.resolve，webpack的resolve也差不多就是这个意思了，webpack默认使用enhanced-resolve第三方库去解析文件路径，源码对应：
+
+lib/Compiler.js
+
+```js
+...
+/** @type {ResolverFactory} */
+this.resolverFactory = new ResolverFactory();
+...
+```
+
+lib/ResolverFactory.js:
+
+```js
+...
+const Factory = require("enhanced-resolve").ResolverFactory;
+...
+```
+
+enhanced-resolve:
+
+```markdown
+- plugin system
+- provide a custom filesystem
+- sync and async node.js filesystems included
+
+```
+
+ok，概念我们就介绍到这里了，我们下面结合demo用一下resolve的配置。
+
+#### alias
+
+`object`
+
+设置一个路径的别名信息。
+
+创建 `import` 或 `require` 的别名，来确保模块引入变得更简单。例如我们demo中，一些位于 `src/` 文件夹下的常用模块：
+
+```js
+alias: {
+ 	DemoVue: path.resolve(__dirname,"./src/demo-vue.vue")
+}
+```
+
+之前我们在index.js中引用demo-vue.vue文件的时候是这样的：
+
+src/index.js
+
+```js
+__webpack_public_path__ = "http://localhost:8091/webpack-demo/lib/";
+import demoVue from "./demo-vue.vue";
+import Vue from "vue";
+new Vue({
+    el: "#app",
+    render:(h)=>h(demoVue)
+});
+```
+
+现在换成别名的话我们可以这样导入了，
+
+src/index.js：
+
+```js
+__webpack_public_path__ = "http://localhost:8091/webpack-demo/lib/";
+import demoVue from "DemoVue";
+import Vue from "vue";
+new Vue({
+    el: "#app",
+    render:(h)=>h(demoVue)
+});
+```
+
+也可以在给定对象的键后的末尾添加 `$`，以表示精准匹配：
+
+```js
+alias: {
+  DemoVue$: path.resolve(__dirname,"./src/demo-vue.vue")
+}
+```
+
+这将产生以下结果：
+
+```js
+import DemoVue from 'DemoVue'; // 精确匹配，所以 src/demo-vue.vue 被解析和导入
+import DemoVue from 'DemoVue/file.js'; // 非精确匹配，触发普通解析
+
+//如果不加$符号的话 以下解析将会报错 因为webpack会直接拼接path “/src/demo-vue.vue/file.js”报错
+import DemoVue from 'DemoVue/file.js';
+```
+
+#### Extensions
+
+`[string] 默认为 ['.wasm', '.mjs', '.js', '.json']`
+
+能够使用户在引入模块时不带文件后缀，比如我们demo中引入.vue文件，我们也让它可以省略后缀，我们首先修改一些配置文件，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/,
+        rules: [
+            {
+                test: /.vue$/,
+                use: 'vue-loader',
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "postcss-loader",
+                        options: {
+                            config: {
+                                path: path.resolve(__dirname,"./postcss.config.js")
+                            }
+                        }
+                    },
+                    "sass-loader"
+                ],
+            },
+            {
+                test: /\.png$/,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        loader: "url-loader",
+                        options: {
+                            limit: 1024*1024*10
+                        }
+                    },
+                    {
+                        resourceQuery: /external/,
+                        loader: "file-loader",
+                    }
+                ]
+            }
+        ]
+    },
+    resolve: {
+        alias: {
+            DemoVue: path.resolve(__dirname,"./src/demo-vue.vue")
+        },
+        extensions: ['.wasm', '.js', '.json','.vue']
+    },
+    plugins: [
+        new (require("vue-loader-plugin"))()
+    ],
+};
+```
+
+然后我们导入.vue文件的时候就可以不用写后缀了：
+
+```js
+import demoVue from "./demo-vue";
+```
+
+默认后缀的源码为：
+
+lib/WebpackOptionsDefaulter.js
+
+```js
+...
+this.set("resolve.extensions", "make", options =>
+			[options.experiments.mjs && ".mjs", ".js", ".json", ".wasm"].filter(
+				Boolean
+			)
+		);
+...
+```
+
+#### enforceExtension
+
+boolean 默认 false
+
+如果为true将不允许无扩展名(extension-less)文件，这个选项其实就是extendsion选项的开关。
+
+#### enforceModuleExtension
+
+`boolean`
+
+对模块是否需要使用的扩展（例如 loader）。默认：
+
+```js
+enforceModuleExtension: false
+```
+
+*Removed in webpack 5*
+
+#### mainFields
+
+`array` 
+
+当从 npm 包中导入模块时（例如，`import * as D3 from "d3"`），此选项将决定在 `package.json` 中使用哪个字段导入模块。根据 webpack 配置中指定的 [`target`](https://www.webpackjs.com/concepts/targets) 不同，默认值也会有所不同。
+
+当 `target` 属性设置为 `webworker`, `web` 或者没有指定，默认值为：
+
+```js
+mainFields: ["browser", "module", "main"]
+```
+
+对于其他任意的 target（包括 `node`），默认值为：
+
+```js
+mainFields: ["module", "main"]
+```
+
+比如我们demo中的第三方依赖vue，我们打开vue的pakcage.json文件看看，
+
+node_modules/vue/package.json：
+
+```json
+{
+  ...
+  "main": "dist/vue.runtime.common.js",
+  "module": "dist/vue.runtime.esm.js",
+  ...
+}
+```
+
+可以看到，vue指定了两个入口，所以demo中按照规则会优先加载“module”。
+
+#### modules
+
+`array = ['node_modules']`
+
+告诉 webpack 解析模块时应该搜索的目录。
+
+绝对路径和相对路径都能使用，但是要知道它们之间有一点差异。
+
+通过查看当前目录以及祖先路径（即 `./node_modules`, `../node_modules` 等等），相对路径将类似于 Node 查找 'node_modules' 的方式进行查找。
+
+使用绝对路径，将只在给定目录中搜索。
+
+`resolve.modules` defaults to:
+
+```js
+modules: ["node_modules"]
+```
+
+如果你想要添加一个目录到模块搜索目录，此目录优先于 `node_modules/` 搜索：
+
+```js
+modules: [path.resolve(__dirname, "src"), "node_modules"]
+```
+
+比如我们需要在index.js中去加载src/demo-public.js文件，当我们没有指定路径加载的时候，
+
+src/index.js:
+
+```js
+import "demo-publicpath";
+```
+
+打包编译会报错：
+
+```
+ERROR in ./index.js 4:0-25
+Module not found: Error: Can't resolve 'demo-publicpath' in '/Users/ocj1/doc/h5/study/webpack/webpack-demo/src'
+
+➜  webpack-demo git:(master) ✗ npx webpack
+
+```
+
+然后我们把src也添加进modules，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/,
+        rules: [
+            {
+                test: /.vue$/,
+                use: 'vue-loader',
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "postcss-loader",
+                        options: {
+                            config: {
+                                path: path.resolve(__dirname,"./postcss.config.js")
+                            }
+                        }
+                    },
+                    "sass-loader"
+                ],
+            },
+            {
+                test: /\.png$/,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        loader: "url-loader",
+                        options: {
+                            limit: 1024*1024*10
+                        }
+                    },
+                    {
+                        resourceQuery: /external/,
+                        loader: "file-loader",
+                    }
+                ]
+            }
+        ]
+    },
+    resolve: {
+        alias: {
+            DemoVue: path.resolve(__dirname,"./src/demo-vue.vue")
+        },
+        extensions: ['.wasm', '.mjs', '.js', '.json','.vue'],
+        modules: [path.resolve(__dirname, "src"), "node_modules"]
+    },
+    plugins: [
+        new (require("vue-loader-plugin"))()
+    ],
+};
+```
+
+再次打包编译是ok的。
+
+#### unsafeCache
+
+`regex` `array` `boolean`
+
+启用，会主动缓存模块，但并**不安全**。传递 `true` 将缓存一切。默认：
+
+```js
+unsafeCache: true
+```
+
+正则表达式，或正则表达式数组，可以用于匹配文件路径或只缓存某些模块。例如，只缓存 utilities 模块：
+
+```js
+unsafeCache: /src\/utilities/
+```
+
+这个选项其实是加快webpack打包速度的选项，比如我们上面说的./src/demo-publicpath.js文件，我们认为它是不会改变的，所以我们就把它加入到缓存中，
+
+```js
+ resolve: {
+        alias: {
+            DemoVue: path.resolve(__dirname,"./src/demo-vue.vue")
+        },
+        extensions: ['.wasm', '.mjs', '.js', '.json','.vue'],
+        modules: [path.resolve(__dirname, "src"), "node_modules"],
+        unsafeCache: /demo-publicpath/,
+    },
+```
+
+这样webpack就不会每次都去做文件读取了，如果缓存中有就直接读缓存了。
+
+好啦，其实webpack的resolve也是依赖的另外一个第三方库，同样是在webpack组织下，估计是被收编了，resolve的更多参数和用法可以参考另外一个库：
+
+[https://github.com/webpack/enhanced-resolve](https://github.com/webpack/enhanced-resolve)
+
+### ResolveLoader
+
+`object`
+
+webpack加载loader的时候也是通过resolve去加载的，但是webpack单独把loader的配置抽离出来了，这组选项与上面的 `resolve` 对象的属性集合相同，但仅用于解析 webpack 的 [loader](https://www.webpackjs.com/concepts/loaders) 包。默认：
+
+```js
+{
+  modules: [ 'node_modules' ],
+  extensions: [ '.js', '.json' ],
+  mainFields: [ 'loader', 'main' ]
+}
+```
+
+> 注意，这里你可以使用别名，并且其他特性类似于 resolve 对象。例如，`{ txt: 'raw-loader' }` 会使用 `raw-loader` 去 shim(填充) `txt!templates/demo.txt`。
+
+### plugins
+
+`array`
+
+webpack 插件列表, 比如我们上面用了一个vue-loader-plugin插件:
+
+```js
+plugins: [
+        new (require("vue-loader-plugin"))()
+    ],
+```
+
+webpack社区有很多插件，大家可以先浏览一下：
+
+[https://webpack.js.org/plugins/](https://webpack.js.org/plugins/)
+
+后面我们会在项目实战的时候介绍一些常用插件的用法，最后还会去自定义一个插件。
+
+👌～ webpack的基本配置内容我们结合demo跟webpack的官网差不多就已经结束了，后面我们会针对开发环境还有包优化做解析（因为一篇文章实在是太长了～ 😂），下期见！！
+
+
+
+demo源码地址：[https://github.com/913453448/webpack-demo.git](https://github.com/913453448/webpack-demo.git)
