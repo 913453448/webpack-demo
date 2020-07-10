@@ -1,6 +1,6 @@
 <template>
 <div class="demo-vue">
-    hello fox
+    hello fox1
     <img :src="pubImg">
 </div>
 </template>

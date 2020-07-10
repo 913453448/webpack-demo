@@ -35,7 +35,7 @@ module.exports = {
                         loader: "postcss-loader",
                         options: {
                             config: {
-                                path: path.resolve(__dirname,"./postcss.config.js")
+                                path: path.resolve(__dirname, "./postcss.config.js")
                             }
                         }
                     },
@@ -49,7 +49,7 @@ module.exports = {
                         resourceQuery: /inline/,
                         loader: "url-loader",
                         options: {
-                            limit: 1024*1024*10
+                            limit: 1024 * 1024 * 10
                         }
                     },
                     {
@@ -62,13 +62,37 @@ module.exports = {
     },
     resolve: {
         alias: {
-            DemoVue: path.resolve(__dirname,"./src/demo-vue.vue")
+            DemoVue: path.resolve(__dirname, "./src/demo-vue.vue")
         },
-        extensions: ['.wasm', '.mjs', '.js', '.json','.vue'],
+        extensions: ['.wasm', '.mjs', '.js', '.json', '.vue'],
         modules: [path.resolve(__dirname, "src"), "node_modules"],
         unsafeCache: /demo-publicpath/,
     },
     plugins: [
         new (require("vue-loader-plugin"))()
     ],
+    devServer: {
+        before(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                req.query.name="hello "+req.query.name;
+                next();
+            });
+        },
+        after(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                res.json({msg: req.query.name});
+            });
+        },
+        clientLogLevel: "info",
+        allowedHosts: [
+            "localhost"
+        ],
+        contentBase: path.join(process.cwd(), "lib"),
+        // contentBasePublicPath: "/assets",
+        filename: /app\.js/,
+        headers: {
+            'X-Custom-Foo': 'bar'
+        },
+        historyApiFallback: true
+    }
 };
