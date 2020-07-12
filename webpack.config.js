@@ -2,7 +2,7 @@ const path = require("path");
 module.exports = {
     mode: "development",
     context: path.resolve(__dirname, "./src"),
-    // entry: ["babel-polyfill","./index.js"]
+    // entry: ["babel-polyfill","./index.js"],
     entry: {
         app: ["./index.js"]
     },
@@ -69,7 +69,10 @@ module.exports = {
         unsafeCache: /demo-publicpath/,
     },
     plugins: [
-        new (require("vue-loader-plugin"))()
+        new (require("vue-loader-plugin"))(),
+        // new (require("uglifyjs-webpack-plugin"))({
+        //     test: /\.js($|\?)/i
+        // })
     ],
     devServer: {
         before(app, server, compiler) {
@@ -97,10 +100,13 @@ module.exports = {
         host: "0.0.0.0",
         port: "8090",
         hot: true,
-        liveReload: false,
+        liveReload: true,
         open: true,
         useLocalIp: true,
         overlay: true,
-        publicPath: "/dist/"
-    }
+    },
+    // performance: {
+    //     hints: "error",
+    //     maxEntrypointSize: 1024
+    // }
 };
