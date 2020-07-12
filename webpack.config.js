@@ -93,6 +93,14 @@ module.exports = {
         headers: {
             'X-Custom-Foo': 'bar'
         },
-        historyApiFallback: true
+        historyApiFallback: true,
+        host: "0.0.0.0",
+        port: "8090",
+        hot: true,
+        liveReload: false,
+        open: true,
+        useLocalIp: true,
+        overlay: true,
+        publicPath: "/dist/"
     }
 };

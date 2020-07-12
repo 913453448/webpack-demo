@@ -4,7 +4,7 @@ import Vue from "vue";
 import "demo-publicpath";
 const root=document.createElement("div");
 root.id="app";
-document.body.appendChild(root);
+document.body.appendChild(root)
 const app=new Vue({
     render:(h)=>h(demoVue)
 });

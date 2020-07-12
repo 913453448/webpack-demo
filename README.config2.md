@@ -344,7 +344,7 @@ const isValidHostname =
 
 这个就是上面allowedHosts配置的开关，为true就不会去校验白名单了。
 
-### `color`- CLI only
+### color- CLI only
 
 `boolean`
 
@@ -875,4 +875,1576 @@ const historyApiFallback = require('connect-history-api-fallback');
   }
 ...
 ```
+
+### host
+
+指定使用一个 host。默认是 `localhost`。
+
+没什么好分析的，因为webpack-dev-server也是直接给到了http,
+
+node_modules/webpack-dev-server/lib/Server.js:
+
+```js
+...
+listen(port, hostname, fn) {
+    this.hostname = hostname;
+
+    return this.listeningApp.listen(port, hostname, (err) => {
+...
+```
+
+如果你希望服务器外部可访问，指定如下：
+
+```js
+host: "0.0.0.0"
+```
+
+Usage via the CLI
+
+```bash
+webpack-dev-server --host 0.0.0.0
+```
+
+### port
+
+`number 默认： 8080`
+
+指定服务器的端口。
+
+我们demo中用一下host跟port参数，
+
+webpack.config.js:
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/,
+        rules: [
+            {
+                test: /.vue$/,
+                use: 'vue-loader',
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "postcss-loader",
+                        options: {
+                            config: {
+                                path: path.resolve(__dirname, "./postcss.config.js")
+                            }
+                        }
+                    },
+                    "sass-loader"
+                ],
+            },
+            {
+                test: /\.png$/,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        loader: "url-loader",
+                        options: {
+                            limit: 1024 * 1024 * 10
+                        }
+                    },
+                    {
+                        resourceQuery: /external/,
+                        loader: "file-loader",
+                    }
+                ]
+            }
+        ]
+    },
+    resolve: {
+        alias: {
+            DemoVue: path.resolve(__dirname, "./src/demo-vue.vue")
+        },
+        extensions: ['.wasm', '.mjs', '.js', '.json', '.vue'],
+        modules: [path.resolve(__dirname, "src"), "node_modules"],
+        unsafeCache: /demo-publicpath/,
+    },
+    plugins: [
+        new (require("vue-loader-plugin"))()
+    ],
+    devServer: {
+        before(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                req.query.name="hello "+req.query.name;
+                next();
+            });
+        },
+        after(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                res.json({msg: req.query.name});
+            });
+        },
+        clientLogLevel: "info",
+        allowedHosts: [
+            "localhost"
+        ],
+        contentBase: path.join(process.cwd(), "lib"),
+        // contentBasePublicPath: "/assets",
+        filename: /app\.js/,
+        headers: {
+            'X-Custom-Foo': 'bar'
+        },
+        historyApiFallback: true,
+        host: "0.0.0.0",
+        port: "8090"
+    }
+};
+```
+
+我们指定了host为“0.0.0.0”，端口指定了“8090”，我们运行webpack-dev-server：
+
+```js
+^C192:webpack-demo yinqingyang$ node ./node_modules/webpack/node_modules/.bin/webpack-dev-server 
+watch undefined
+callback undefined
+ℹ ｢wds｣: Project is running at http://0.0.0.0:8090/
+ℹ ｢wds｣: webpack output is served from /
+ℹ ｢wds｣: Content not xxx
+ℹ ｢wds｣: 404s will fallback to /index.html
+ℹ ｢wdm｣: Hash: 1cd70981ab252d761840
+Version: webpack 5.0.0-beta.7
+
+```
+
+可以看到一些提示信息，说我们的项目已经在“http://0.0.0.0:8090/”上运行了。
+
+我们可以利用当前ip在局域网访问我们的服务器了，比如访问我们的电脑：http://192.168.2.103:8090/webpack-dev-server
+
+### hot
+
+`boolean=false`
+
+启用 webpack 的模块[Hot Module Replacement](https://webpack.js.org/concepts/hot-module-replacement/) (热替换)特性：
+
+**webpack.config.js**
+
+```javascript
+module.exports = {
+  //...
+  devServer: {
+    hot: true
+  }
+};
+```
+
+*Note that* [`webpack.HotModuleReplacementPlugin`](https://webpack.js.org/plugins/hot-module-replacement-plugin/) *is required to fully enable HMR. If* `webpack` *or* `webpack-dev-server` *are launched with the* `--hot` *option, this plugin will be added automatically, so you may not need to add this to your* `webpack.config.js`*. See the* [HMR concepts page](https://webpack.js.org/concepts/hot-module-replacement/) *for more information.*
+
+如果`webpack-dev-server`设置了hot属性的话，就会自动的给webpack添加[`webpack.HotModuleReplacementPlugin`](https://webpack.js.org/plugins/hot-module-replacement-plugin/)插件。
+
+什么意思呢？ 我们在demo的webpack配置中打开hot属性：
+
+webpack.config.js
+
+```js
+ devServer: {
+        before(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                req.query.name="hello "+req.query.name;
+                next();
+            });
+        },
+        after(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                res.json({msg: req.query.name});
+            });
+        },
+        clientLogLevel: "info",
+        allowedHosts: [
+            "localhost"
+        ],
+        contentBase: path.join(process.cwd(), "lib"),
+        // contentBasePublicPath: "/assets",
+        filename: /app\.js/,
+        headers: {
+            'X-Custom-Foo': 'bar'
+        },
+        historyApiFallback: true,
+        host: "0.0.0.0",
+        port: "8090",
+        hot: true
+    }
+```
+
+然后我们运行webpack：
+
+```
+ node ./node_modules/webpack/node_modules/.bin/webpack-dev-server
+```
+
+然后打开http://127.0.0.1:8090/webpack-dev-server页面找到我们的app入口：
+
+```js
+63fe41824cb8236c0896a71b7df7f461.png
+app.f3eee8fa7df557cf.27c85f7ee5cd42b3.app.js
+app.f3eee8fa7df557cf.27c85f7ee5cd42b3.app (magic html for app.f3eee8fa7df557cf.27c85f7ee5cd42b3.app.js) (webpack-dev-server)
+```
+
+我们直接点开app入口“app.f3eee8fa7df557cf.27c85f7ee5cd42b3.app”，当你打开页面的时候会显示页面内容，当修改了某一个值的时候webpack会自动编译，然后自动刷新页面，效果我就不演示了。
+
+源码位置：
+
+node_modules/webpack-dev-server/lib/utils/addEntries.js
+
+```js
+...
+ if (options.hot || options.hotOnly) {
+        config.plugins = config.plugins || [];
+        if (
+          !config.plugins.find(
+            // Check for the name rather than the constructor reference in case
+            // there are multiple copies of webpack installed
+            (plugin) => plugin.constructor.name === 'HotModuleReplacementPlugin'
+          )
+        ) {
+          config.plugins.push(new webpack.HotModuleReplacementPlugin());
+        }
+      }
+...
+```
+
+可以看到，会自动的添加HotModuleReplacementPlugin插件。
+
+### hotOnly
+
+跟上面的hot功能基本一致，但是当webpack编译失败或者遇到其它问题的时候，需要强制reload当前页面才能看到效果的时候，hotOnly是不会刷新页面的。
+
+源码位置：
+
+node_modules/webpack-dev-server/lib/utils/addEntries.js:
+
+```js
+...
+  if (options.hotOnly) {
+      hotEntry = require.resolve('webpack/hot/only-dev-server');
+    } else if (options.hot) {
+      hotEntry = require.resolve('webpack/hot/dev-server');
+    }
+...
+```
+
+webpack/hot/dev-server.js
+
+```js
+...
+if (module.hot) {
+...
+	var check = function check() {
+		module.hot
+			.check(true)
+			.then(function(updatedModules) {
+				...
+					window.location.reload();
+					return;
+				}
+```
+
+webpack/hot/only-dev-server.js:
+
+```js
+var check = function check() {
+		module.hot
+			.check()
+			.then(function(updatedModules) {
+				if (!updatedModules) {
+					log("warning", "[HMR] Cannot find update. Need to do a full reload!");
+					log(
+						"warning",
+						"[HMR] (Probably because of restarting the webpack-dev-server)"
+					);
+					return;
+				}
+```
+
+可以看到，dev-server是会去reload页面的，而only-dev-server是不会去reload页面的。
+
+### https
+
+`boolean` `object`
+
+默认情况下，dev-server 通过 HTTP 提供服务。也可以选择带有 HTTPS 的 HTTP/2 提供服务：
+
+```js
+https: true
+```
+
+以上设置使用了自签名证书，但是你可以提供自己的：
+
+```js
+https: {
+  key: fs.readFileSync("/path/to/server.key"),
+  cert: fs.readFileSync("/path/to/server.crt"),
+  ca: fs.readFileSync("/path/to/ca.pem"),
+}
+```
+
+此对象直接传递到 Node.js HTTPS 模块，所以更多信息请查看 [HTTPS 文档](https://nodejs.org/api/https.html)。
+
+Usage via the CLI
+
+```bash
+webpack-dev-server --https
+```
+
+To pass your own certificate via the CLI use the following options
+
+```bash
+webpack-dev-server --https --key /path/to/server.key --cert /path/to/server.crt --cacert /path/to/ca.
+```
+
+### index
+
+`string="index.html"`
+
+The filename that is considered the index file.
+
+```javascript
+index: 'index.htm'
+```
+
+### Info - CLI only
+
+```
+boolean
+```
+
+终端显示的信息. 默认开启，如果需要关闭：
+
+```bash
+webpack-dev-server --info=false
+```
+
+这样终端输出栏中就不会有编译信息了：
+
+```bash
+^C192:webpack-demo yinqingyang$ node ./node_modules/webpack/node_modules/.bin/webpack-dev-server --info=false
+```
+
+### injectClient
+
+webpack-dev-server默认会为特定的target添加webpack的entry文件“client”，client入口负责跟webpack-dev-server保持socket通信（编译成功、log信息、热载、overlay等等），比如hot功能，其实就是利用[HotModuleReplacementPlugin`](https://webpack.js.org/plugins/hot-module-replacement-plugin/)插件动态往js文件中注入hot模块跟client通信。
+
+client入口源码：
+
+node_modules/webpack-dev-server/client/index.js
+
+```js
+'use strict';
+/* global __resourceQuery WorkerGlobalScope self */
+
+/* eslint prefer-destructuring: off */
+
+var stripAnsi = require('strip-ansi');
+
+var socket = require('./socket');
+
+var overlay = require('./overlay');
+
+var _require = require('./utils/log'),
+    log = _require.log,
+    setLogLevel = _require.setLogLevel;
+
+var sendMessage = require('./utils/sendMessage');
+
+var reloadApp = require('./utils/reloadApp');
+
+var createSocketUrl = require('./utils/createSocketUrl');
+
+var status = {
+  isUnloading: false,
+  currentHash: ''
+};
+var options = {
+  hot: false,
+  hotReload: true,
+  liveReload: false,
+  initial: true,
+  useWarningOverlay: false,
+  useErrorOverlay: false,
+  useProgress: false
+};
+var socketUrl = createSocketUrl(__resourceQuery);
+self.addEventListener('beforeunload', function () {
+  status.isUnloading = true;
+});
+
+if (typeof window !== 'undefined') {
+  var qs = window.location.search.toLowerCase();
+  options.hotReload = qs.indexOf('hotreload=false') === -1;
+}
+
+var onSocketMessage = {
+  hot: function hot() {
+    options.hot = true;
+    log.info('[WDS] Hot Module Replacement enabled.');
+  },
+  liveReload: function liveReload() {
+    options.liveReload = true;
+    log.info('[WDS] Live Reloading enabled.');
+  },
+  invalid: function invalid() {
+    log.info('[WDS] App updated. Recompiling...'); // fixes #1042. overlay doesn't clear if errors are fixed but warnings remain.
+
+    if (options.useWarningOverlay || options.useErrorOverlay) {
+      overlay.clear();
+    }
+
+    sendMessage('Invalid');
+  },
+  hash: function hash(_hash) {
+    status.currentHash = _hash;
+  },
+  'still-ok': function stillOk() {
+    log.info('[WDS] Nothing changed.');
+
+    if (options.useWarningOverlay || options.useErrorOverlay) {
+      overlay.clear();
+    }
+
+    sendMessage('StillOk');
+  },
+  'log-level': function logLevel(level) {
+    var hotCtx = require.context('webpack/hot', false, /^\.\/log$/);
+
+    if (hotCtx.keys().indexOf('./log') !== -1) {
+      hotCtx('./log').setLogLevel(level);
+    }
+
+    setLogLevel(level);
+  },
+  overlay: function overlay(value) {
+    if (typeof document !== 'undefined') {
+      if (typeof value === 'boolean') {
+        options.useWarningOverlay = false;
+        options.useErrorOverlay = value;
+      } else if (value) {
+        options.useWarningOverlay = value.warnings;
+        options.useErrorOverlay = value.errors;
+      }
+    }
+  },
+  progress: function progress(_progress) {
+    if (typeof document !== 'undefined') {
+      options.useProgress = _progress;
+    }
+  },
+  'progress-update': function progressUpdate(data) {
+    if (options.useProgress) {
+      log.info("[WDS] ".concat(data.percent, "% - ").concat(data.msg, "."));
+    }
+
+    sendMessage('Progress', data);
+  },
+  ok: function ok() {
+    sendMessage('Ok');
+
+    if (options.useWarningOverlay || options.useErrorOverlay) {
+      overlay.clear();
+    }
+
+    if (options.initial) {
+      return options.initial = false;
+    } // eslint-disable-line no-return-assign
+
+
+    reloadApp(options, status);
+  },
+  'content-changed': function contentChanged() {
+    log.info('[WDS] Content base changed. Reloading...');
+    self.location.reload();
+  },
+  warnings: function warnings(_warnings) {
+    log.warn('[WDS] Warnings while compiling.');
+
+    var strippedWarnings = _warnings.map(function (warning) {
+      return stripAnsi(warning);
+    });
+
+    sendMessage('Warnings', strippedWarnings);
+
+    for (var i = 0; i < strippedWarnings.length; i++) {
+      log.warn(strippedWarnings[i]);
+    }
+
+    if (options.useWarningOverlay) {
+      overlay.showMessage(_warnings);
+    }
+
+    if (options.initial) {
+      return options.initial = false;
+    } // eslint-disable-line no-return-assign
+
+
+    reloadApp(options, status);
+  },
+  errors: function errors(_errors) {
+    log.error('[WDS] Errors while compiling. Reload prevented.');
+
+    var strippedErrors = _errors.map(function (error) {
+      return stripAnsi(error);
+    });
+
+    sendMessage('Errors', strippedErrors);
+
+    for (var i = 0; i < strippedErrors.length; i++) {
+      log.error(strippedErrors[i]);
+    }
+
+    if (options.useErrorOverlay) {
+      overlay.showMessage(_errors);
+    }
+
+    options.initial = false;
+  },
+  error: function error(_error) {
+    log.error(_error);
+  },
+  close: function close() {
+    log.error('[WDS] Disconnected!');
+    sendMessage('Close');
+  }
+};
+socket(socketUrl, onSocketMessage);
+```
+
+client具体源码内容就不在这里分析了，不过后面可能会单独写一篇文章来解析webpack的热载功能。
+
+ok～也就是说如果关闭了injectClient选项的话，hot跟hotOnly、overlay等功能都会失效。
+
+### injectHot
+
+跟上面的injectClient差不多，算控制injectClient的一个hot子项，比如我们需要根据配置文件来看是不是需要关闭热载功能：
+
+```js
+module.exports = {
+  //...
+  devServer: {
+    hot: true,
+    injectHot: (compilerConfig) => compilerConfig.name === 'only-include'
+  }
+};
+```
+
+### inline
+
+就是控制上面说的hot、injectClient、injectHot等client端的一些配置，看源码估计一目了然了：
+
+node_modules/webpack-dev-server/lib/utils/addEntries.js
+
+```js
+function addEntries(config, options, server) {
+  if (options.inline !== false) {
+    // we're stubbing the app in this method as it's static and doesn't require
+    // a server to be supplied. createDomain requires an app with the
+    // address() signature.
+
+    const app = server || {
+      address() {
+        return { port: options.port };
+      },
+    };
+       let hotEntry;
+
+    if (options.hotOnly) {
+      hotEntry = require.resolve('webpack/hot/only-dev-server');
+    } else if (options.hot) {
+      hotEntry = require.resolve('webpack/hot/dev-server');
+    }
+    ...
+```
+
+有什么用呢？比如我们需要自己实现一个热载功能，就可以使用inline=false关闭所有client相关的代码，避免我们的代码受到侵入。
+
+### open
+
+`boolean = false` `string` `object`
+
+是否在服务器开启之后打开某个页面，传递的参数最后会给到opn第三方库,
+
+node_modules/opn/readme.md:
+
+~~~markdown
+# opn
+
+> A better [node-open](https://github.com/pwnall/node-open). Opens stuff like websites, files, executables. Cross-platform.
+
+If need this for Electron, use [`shell.openItem()`](https://electronjs.org/docs/api/shell#shellopenitemfullpath) instead.
+
+
+#### Why?
+
+- Actively maintained
+- Supports app arguments
+- Safer as it uses `spawn` instead of `exec`
+- Fixes most of the open `node-open` issues
+- Includes the latest [`xdg-open` script](http://cgit.freedesktop.org/xdg/xdg-utils/commit/?id=c55122295c2a480fa721a9614f0e2d42b2949c18) for Linux
+
+
+## Install
+
+```
+$ npm install opn
+```
+
+
+## Usage
+
+```js
+const opn = require('opn');
+
+// Opens the image in the default image viewer
+opn('unicorn.png').then(() => {
+	// image viewer closed
+});
+
+// Opens the url in the default browser
+opn('http://sindresorhus.com');
+
+// Specify the app to open in
+opn('http://sindresorhus.com', {app: 'firefox'});
+
+// Specify app arguments
+opn('http://sindresorhus.com', {app: ['google chrome', '--incognito']});
+```
+
+
+## API
+
+Uses the command `open` on macOS, `start` on Windows and `xdg-open` on other platforms.
+
+### opn(target, [options])
+
+Returns a promise for the [spawned child process](https://nodejs.org/api/child_process.html#child_process_class_childprocess). You would normally not need to use this for anything, but it can be useful if you'd like to attach custom event listeners or perform other operations directly on the spawned process.
+
+#### target
+
+Type: `string`
+
+The thing you want to open. Can be a URL, file, or executable.
+
+Opens in the default app for the file type. For example, URLs opens in your default browser.
+
+#### options
+
+Type: `Object`
+
+##### wait
+
+Type: `boolean`<br>
+Default: `true`
+
+Wait for the opened app to exit before fulfilling the promise. If `false` it's fulfilled immediately when opening the app.
+
+On Windows you have to explicitly specify an app for it to be able to wait.
+
+##### app
+
+Type: `string` `Array`
+
+Specify the app to open the `target` with, or an array with the app and app arguments.
+
+The app name is platform dependent. Don't hard code it in reusable modules. For example, Chrome is `google chrome` on macOS, `google-chrome` on Linux and `chrome` on Windows.
+
+
+## Related
+
+- [opn-cli](https://github.com/sindresorhus/opn-cli) - CLI for this module
+
+
+## License
+
+MIT © [Sindre Sorhus](https://sindresorhus.com)
+
+~~~
+
+👌，那么对应webpack-dev-server中的源码是啥呢？
+
+node_modules/webpack-dev-server/lib/Server.js：
+
+```js
+...
+ showStatus() {
+    const suffix =
+      this.options.inline !== false || this.options.lazy === true
+        ? '/'
+        : '/webpack-dev-server/';
+    const uri = `${createDomain(this.options, this.listeningApp)}${suffix}`;
+
+    status(
+      uri,
+      this.options,
+      this.log,
+      this.options.stats && this.options.stats.colors
+    );
+  }
+...
+```
+
+ok，可以看到webpack-dev-server在我们demo中如果open=true的话是默认打开“http://0.0.0.0:8090”。
+
+webpack.config.js：
+
+```js
+devServer: {
+        before(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                req.query.name="hello "+req.query.name;
+                next();
+            });
+        },
+        after(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                res.json({msg: req.query.name});
+            });
+        },
+        clientLogLevel: "info",
+        allowedHosts: [
+            "localhost"
+        ],
+        contentBase: path.join(process.cwd(), "lib"),
+        // contentBasePublicPath: "/assets",
+        filename: /app\.js/,
+        headers: {
+            'X-Custom-Foo': 'bar'
+        },
+        historyApiFallback: true,
+        host: "0.0.0.0",
+        port: "8090",
+        hot: true,
+        liveReload: false,
+        open: true,
+    }
+```
+
+小伙伴可以自己运行一下哦！
+
+我们继续往下看一下：
+
+```js
+ status(
+      uri,
+      this.options,
+      this.log,
+      this.options.stats && this.options.stats.colors
+    );
+```
+
+node_modules/webpack-dev-server/lib/utils/status.js:
+
+```js
+'use strict';
+
+const logger = require('webpack-log');
+const colors = require('./colors');
+const runOpen = require('./runOpen');
+
+// TODO: don't emit logs when webpack-dev-server is used via Node.js API
+function status(uri, options, log, useColor) {
+  ...
+
+  if (options.open) {
+    runOpen(uri, options, log);
+  }
+}
+
+module.exports = status;
+
+```
+
+node_modules/webpack-dev-server/lib/utils/runOpen.js:
+
+```js
+'use strict';
+
+const open = require('opn');
+const isAbsoluteUrl = require('is-absolute-url');
+
+function runOpen(uri, options, log) {
+  // https://github.com/webpack/webpack-dev-server/issues/1990
+  let openOptions = { wait: false };
+  let openOptionValue = '';
+
+  if (typeof options.open === 'string') {
+    openOptions = Object.assign({}, openOptions, { app: options.open });
+    openOptionValue = `: "${options.open}"`;
+  } else if (typeof options.open === 'object') {
+    openOptions = options.open;
+    openOptionValue = `: "${JSON.stringify(options.open)}"`;
+  }
+
+  const pages =
+    typeof options.openPage === 'string'
+      ? [options.openPage]
+      : options.openPage || [''];
+
+  return Promise.all(
+    pages.map((page) => {
+      const pageUrl = page && isAbsoluteUrl(page) ? page : `${uri}${page}`;
+
+      return open(pageUrl, openOptions).catch(() => {
+        log.warn(
+          `Unable to open "${pageUrl}" in browser${openOptionValue}. If you are running in a headless environment, please do not use the --open flag`
+        );
+      });
+    })
+  );
+}
+
+module.exports = runOpen;
+
+```
+
+Ok! 通过上面源码我们可以知道，open选项为string或者object的时候其实就是给opn第三方库的参数，比如我们需要用火狐浏览器打开我们的页面，我们可以这样设置：
+
+string模式
+
+```js
+open: "firefox",
+```
+
+对象模式:
+
+```js
+open: {
+	app: ["firefox"]
+}
+```
+
+还可以传参数跟在数组后面，更多选项可以去参考opn的api。
+
+### openPage
+
+`string or array`
+
+指定打开的页面，可以是一个页面string，也可以是多个页面array，
+
+比如需要打开：
+
+```js
+openPage:[
+  "a",//如果配置了相对路径的话就会打开 domain://host:port/a页面
+  "http://xxx.com.cn" //如果配置了绝对路径的话就会直接打开
+]
+```
+
+### overlay
+
+`boolean=`false `object`
+
+是否需要显示client 的遮罩层（用来显示webpack的errors跟warnings），默认是关闭的，如果要打开可以设置true:
+
+```js
+overlay: true
+```
+
+可以单独设置warnings跟errors是否需要显示：
+
+```js
+overlay: {
+  warnings: true,
+  errors: true
+}
+```
+
+比如我们修改一下index.js让webpack报错，
+
+src/index.html:
+
+```js
+__webpack_public_path__ = "/";
+import demoVue from "./demo-vue";
+import Vue from "vue";
+import "demo-publicpath";
+const root=document.createElement("div");
+root.id="app";
+document.body.appendChild(root
+const app=new Vue({
+    render:(h)=>h(demoVue)
+});
+app.$mount(root);
+```
+
+然后修改配置文件把overlay打开，
+
+webpack.config.js：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/,
+        rules: [
+            {
+                test: /.vue$/,
+                use: 'vue-loader',
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "postcss-loader",
+                        options: {
+                            config: {
+                                path: path.resolve(__dirname, "./postcss.config.js")
+                            }
+                        }
+                    },
+                    "sass-loader"
+                ],
+            },
+            {
+                test: /\.png$/,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        loader: "url-loader",
+                        options: {
+                            limit: 1024 * 1024 * 10
+                        }
+                    },
+                    {
+                        resourceQuery: /external/,
+                        loader: "file-loader",
+                    }
+                ]
+            }
+        ]
+    },
+    resolve: {
+        alias: {
+            DemoVue: path.resolve(__dirname, "./src/demo-vue.vue")
+        },
+        extensions: ['.wasm', '.mjs', '.js', '.json', '.vue'],
+        modules: [path.resolve(__dirname, "src"), "node_modules"],
+        unsafeCache: /demo-publicpath/,
+    },
+    plugins: [
+        new (require("vue-loader-plugin"))()
+    ],
+    devServer: {
+        before(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                req.query.name="hello "+req.query.name;
+                next();
+            });
+        },
+        after(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                res.json({msg: req.query.name});
+            });
+        },
+        clientLogLevel: "info",
+        allowedHosts: [
+            "localhost"
+        ],
+        contentBase: path.join(process.cwd(), "lib"),
+        // contentBasePublicPath: "/assets",
+        filename: /app\.js/,
+        headers: {
+            'X-Custom-Foo': 'bar'
+        },
+        historyApiFallback: true,
+        host: "0.0.0.0",
+        port: "8090",
+        hot: true,
+        liveReload: false,
+        // open: {
+        //     app: ["firefox"]
+        // },
+        overlay: true
+    }
+};
+```
+
+然后运行webpack看效果：
+
+```bash
+...
+./index.js 270 bytes [built] [failed] [1 error]
+    + 39 hidden modules
+
+ERROR in ./index.js 8:0
+Module parse failed: Unexpected token (8:0)
+You may need an appropriate loader to handle this file type, currently no loaders are configured to process this file. See https://webpack.js.org/concepts#loaders
+| root.id="app";
+| document.body.appendChild(root
+> const app=new Vue({
+|     render:(h)=>h(demoVue)
+| });
+
+ℹ ｢wdm｣: Failed to compile.
+
+```
+
+![overlay](/Users/yinqingyang/前端架构系列之(webpack)/webpack-demo/overlay.png)
+
+可以看到，浏览器中显示了终端输出的报错信息：
+
+```bash
+ℹ ｢wdm｣: Failed to compile.
+```
+
+### proxy
+
+`object`
+
+如果你有单独的后端开发服务器 API，并且希望在同域名下发送 API 请求 ，那么代理某些 URL 会很有用。
+
+dev-server 使用了非常强大的 [http-proxy-middleware](https://github.com/chimurai/http-proxy-middleware) 包。更多高级用法，请查阅其[文档](https://github.com/chimurai/http-proxy-middleware#options)。
+
+在 `localhost:3000` 上有后端服务的话，你可以这样启用代理：
+
+```js
+proxy: {
+  "/api": "http://localhost:3000"
+}
+```
+
+请求到 `/api/users` 现在会被代理到请求 `http://localhost:3000/api/users`。
+
+如果你不想始终传递 `/api` ，则需要重写路径：
+
+```js
+proxy: {
+  "/api": {
+    target: "http://localhost:3000",
+    pathRewrite: {"^/api" : ""}
+  }
+}
+```
+
+默认情况下，不接受运行在 HTTPS 上，且使用了无效证书的后端服务器。如果你想要接受，修改配置如下：
+
+```js
+proxy: {
+  "/api": {
+    target: "https://other-server.example.com",
+    secure: false
+  }
+}
+```
+
+有时你不想代理所有的请求。可以基于一个函数的返回值绕过代理。
+
+在函数中你可以访问请求体、响应体和代理选项。必须返回 `false` 或路径，来跳过代理请求。
+
+例如：对于浏览器请求，你想要提供一个 HTML 页面，但是对于 API 请求则保持代理。你可以这样做：
+
+```js
+proxy: {
+  "/api": {
+    target: "http://localhost:3000",
+    bypass: function(req, res, proxyOptions) {
+      if (req.headers.accept.indexOf("html") !== -1) {
+        console.log("Skipping proxy for browser request.");
+        return "/index.html";
+      }
+    }
+  }
+}
+```
+
+If you want to proxy multiple, specific paths to the same target, you can use an array of one or more objects with a `context` property:
+
+```js
+proxy: [{
+  context: ["/auth", "/api"],
+  target: "http://localhost:3000",
+}]
+```
+
+对应源码位置：
+
+node_modules/webpack-dev-server/lib/Server.js
+
+```js
+...
+const httpProxyMiddleware = require('http-proxy-middleware');
+...
+ setupProxyFeature() {
+    /**
+     * Assume a proxy configuration specified as:
+     * proxy: {
+     *   'context': { options }
+     * }
+     * OR
+     * proxy: {
+     *   'context': 'target'
+     * }
+     */
+    if (!Array.isArray(this.options.proxy)) {
+      if (Object.prototype.hasOwnProperty.call(this.options.proxy, 'target')) {
+        this.options.proxy = [this.options.proxy];
+      } else {
+        this.options.proxy = Object.keys(this.options.proxy).map((context) => {
+          let proxyOptions;
+          // For backwards compatibility reasons.
+          const correctedContext = context
+            .replace(/^\*$/, '**')
+            .replace(/\/\*$/, '');
+
+          if (typeof this.options.proxy[context] === 'string') {
+            proxyOptions = {
+              context: correctedContext,
+              target: this.options.proxy[context],
+            };
+          } else {
+            proxyOptions = Object.assign({}, this.options.proxy[context]);
+            proxyOptions.context = correctedContext;
+          }
+
+          proxyOptions.logLevel = proxyOptions.logLevel || 'warn';
+
+          return proxyOptions;
+        });
+      }
+    }
+
+    const getProxyMiddleware = (proxyConfig) => {
+      const context = proxyConfig.context || proxyConfig.path;
+
+      // It is possible to use the `bypass` method without a `target`.
+      // However, the proxy middleware has no use in this case, and will fail to instantiate.
+      if (proxyConfig.target) {
+        return httpProxyMiddleware(context, proxyConfig);
+      }
+    };
+    /**
+     * Assume a proxy configuration specified as:
+     * proxy: [
+     *   {
+     *     context: ...,
+     *     ...options...
+     *   },
+     *   // or:
+     *   function() {
+     *     return {
+     *       context: ...,
+     *       ...options...
+     *     };
+     *   }
+     * ]
+     */
+    this.options.proxy.forEach((proxyConfigOrCallback) => {
+      let proxyMiddleware;
+
+      let proxyConfig =
+        typeof proxyConfigOrCallback === 'function'
+          ? proxyConfigOrCallback()
+          : proxyConfigOrCallback;
+
+      proxyMiddleware = getProxyMiddleware(proxyConfig);
+
+      if (proxyConfig.ws) {
+        this.websocketProxies.push(proxyMiddleware);
+      }
+
+      const handle = (req, res, next) => {
+        if (typeof proxyConfigOrCallback === 'function') {
+          const newProxyConfig = proxyConfigOrCallback();
+
+          if (newProxyConfig !== proxyConfig) {
+            proxyConfig = newProxyConfig;
+            proxyMiddleware = getProxyMiddleware(proxyConfig);
+          }
+        }
+
+        // - Check if we have a bypass function defined
+        // - In case the bypass function is defined we'll retrieve the
+        // bypassUrl from it otherwise bypassUrl would be null
+        const isByPassFuncDefined = typeof proxyConfig.bypass === 'function';
+        const bypassUrl = isByPassFuncDefined
+          ? proxyConfig.bypass(req, res, proxyConfig)
+          : null;
+
+        if (typeof bypassUrl === 'boolean') {
+          // skip the proxy
+          req.url = null;
+          next();
+        } else if (typeof bypassUrl === 'string') {
+          // byPass to that url
+          req.url = bypassUrl;
+          next();
+        } else if (proxyMiddleware) {
+          return proxyMiddleware(req, res, next);
+        } else {
+          next();
+        }
+      };
+
+      this.app.use(handle);
+      // Also forward error requests to the proxy so it can handle them.
+      this.app.use((error, req, res, next) => handle(req, res, next));
+    });
+  }
+...
+```
+
+### progress- CLI only
+
+`boolean`
+
+是否开启webpack的ProgressPlugin插件。
+
+源码位置：
+
+node_modules/webpack-dev-server/lib/Server.js
+
+```js
+...
+  setupProgressPlugin() {
+    // for CLI output
+    new webpack.ProgressPlugin({
+      profile: !!this.options.profile,
+    }).apply(this.compiler);
+
+    // for browser console output
+    new webpack.ProgressPlugin((percent, msg, addInfo) => {
+      percent = Math.floor(percent * 100);
+
+      if (percent === 100) {
+        msg = 'Compilation completed';
+      }
+
+      if (addInfo) {
+        msg = `${msg} (${addInfo})`;
+      }
+
+      this.sockWrite(this.sockets, 'progress-update', { percent, msg });
+
+      if (this.listeningApp) {
+        this.listeningApp.emit('progress-update', { percent, msg });
+      }
+    }).apply(this.compiler);
+  }
+...
+```
+
+### public
+
+`string`
+
+当使用*内联模式(inline mode)*并代理 dev-server 时，内联的客户端脚本并不总是知道要连接到什么地方。它会尝试根据 `window.location` 来猜测服务器的 URL，但是如果失败，你需要这样。
+
+例如，dev-server 被代理到 nginx，并且在 `myapp.test` 上可用：
+
+```js
+public: "myapp.test:80"
+```
+
+Usage via the CLI
+
+```bash
+webpack-dev-server --public myapp.test:80
+```
+
+什么意思呢？我们看一下源码就知道了：
+
+node_modules/webpack-dev-server/lib/Server.js
+
+```js
+ checkHeaders(headers, headerToCheck) {
+    if (this.disableHostCheck) {
+      return true;
+    }
+   ...
+    // also allow public hostname if provided
+    if (typeof this.publicHost === 'string') {
+      const idxPublic = this.publicHost.indexOf(':');
+      const publicHostname =
+        idxPublic >= 0 ? this.publicHost.substr(0, idxPublic) : this.publicHost;
+
+      if (hostname === publicHostname) {
+        return true;
+      }
+    }
+
+    // disallow
+    return false;
+  }
+```
+
+也就是说比如：我们配置了80端口，那别人访问“http://myapp.test”没加80端口的时候默认是访问不到的，但是我们可以设置让不加80端口也可以访问：
+
+```js
+public: "myapp.test:80"
+```
+
+### publicPath 🔑
+
+`string="\"`
+
+我们默认运行webpack-dev-server的时候，打好的文件我们是可以直接通过链接访问的，比如我们的demo，我们运行webpack-dev-server：
+
+```bash
+...
+Built at: 2020-07-12 15:31:06
+                                       Asset      Size
+app.45d164a45ace2e8a.2e0aaba2b08fe1a4.app.js   677 KiB  [emitted] [immutable]        [name: app]
+      app.fccb26fdfc9f835794e4.hot-update.js   278 KiB  [emitted] [immutable]
+[hmr]  [name: app]
+        fccb26fdfc9f835794e4.hot-update.json  54 bytes  [emitted] [immutable]
+[hmr]
+ + 1 hidden asset
+Entrypoint app = app.45d164a45ace2e8a.2e0aaba2b08fe1a4.app.js app.fccb26fdfc9f835794e4.hot-update.js (63fe41824cb8236c0896a71b7df7f461.png)
+./index.js 271 bytes [built]
+    + 57 hidden modules
+ℹ ｢wdm｣: Compiled successfully.
+
+```
+
+可以看到，打好了三个文件：
+
+```
+app.45d164a45ace2e8a.2e0aaba2b08fe1a4.app.js
+pp.fccb26fdfc9f835794e4.hot-update.js
+ fccb26fdfc9f835794e4.hot-update.json
+```
+
+我们可以直接在浏览器中访问，比如：http://127.0.0.1:8090/app.45d164a45ace2e8a.2e0aaba2b08fe1a4.app.js
+
+如果我们需要在中间在加一个目录的话，我们可以怎么做呢？是的！ 我们在上一篇文章中也有说过一个ouput.filename的属性，所以我们可以这样：
+
+webpack.config.js：
+
+```js
+output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "dist/[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+```
+
+在filename字段上加了一个目录“dist”，
+
+然后运行webpack-dev-server：
+
+```bash
+Built at: 2020-07-12 15:36:28
+                                            Asset      Size
+             63fe41824cb8236c0896a71b7df7f461.png  59.3 KiB  [emitted]              [name: (app)]
+dist/app.45d164a45ace2e8a.eb72e79c44655777.app.js   677 KiB  [emitted] [immutable]  [name: app]
+Entrypoint app = dist/app.45d164a45ace2e8a.eb72e79c44655777.app.js (63fe41824cb8236c0896a71b7df7f461.png)
+./index.js 271 bytes [built]
+
+```
+
+可以看到，打包好了一个“dist/app.45d164a45ace2e8a.eb72e79c44655777.app.js ”文件，我们可以直接在浏览器中访问：“http://127.0.0.1:8090/dist/app.45d164a45ace2e8a.eb72e79c44655777.app.js”。
+
+ok！ 除了改output.filename，我们还可以直接修改devServer的publicPath目录：
+
+```js
+const path = require("path");
+module.exports = {
+    mode: "development",
+    context: path.resolve(__dirname, "./src"),
+    // entry: ["babel-polyfill","./index.js"]
+    entry: {
+        app: ["./index.js"]
+    },
+    output: {
+        path: path.join(process.cwd(), "lib"), //默认为path.join(process.cwd(), "dist")
+        pathinfo: true,
+        filename: "[name].[contenthash:16].[fullhash:16].[id].js",
+        chunkFilename: "[id].js",
+        // library: "demoSay",
+        // libraryExport: "default",
+        // libraryTarget: "jsonp",
+
+    },
+    experiments: {
+        // outputModule: true
+    },
+    module: {
+        noParse: /babel-polyfill/,
+        rules: [
+            {
+                test: /.vue$/,
+                use: 'vue-loader',
+            },
+            {
+                test: /\.(sass|scss)$/,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    {
+                        loader: "postcss-loader",
+                        options: {
+                            config: {
+                                path: path.resolve(__dirname, "./postcss.config.js")
+                            }
+                        }
+                    },
+                    "sass-loader"
+                ],
+            },
+            {
+                test: /\.png$/,
+                oneOf: [
+                    {
+                        resourceQuery: /inline/,
+                        loader: "url-loader",
+                        options: {
+                            limit: 1024 * 1024 * 10
+                        }
+                    },
+                    {
+                        resourceQuery: /external/,
+                        loader: "file-loader",
+                    }
+                ]
+            }
+        ]
+    },
+    resolve: {
+        alias: {
+            DemoVue: path.resolve(__dirname, "./src/demo-vue.vue")
+        },
+        extensions: ['.wasm', '.mjs', '.js', '.json', '.vue'],
+        modules: [path.resolve(__dirname, "src"), "node_modules"],
+        unsafeCache: /demo-publicpath/,
+    },
+    plugins: [
+        new (require("vue-loader-plugin"))()
+    ],
+    devServer: {
+        before(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                req.query.name="hello "+req.query.name;
+                next();
+            });
+        },
+        after(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                res.json({msg: req.query.name});
+            });
+        },
+        clientLogLevel: "info",
+        allowedHosts: [
+            "localhost"
+        ],
+        contentBase: path.join(process.cwd(), "lib"),
+        // contentBasePublicPath: "/assets",
+        filename: /app\.js/,
+        headers: {
+            'X-Custom-Foo': 'bar'
+        },
+        historyApiFallback: true,
+        host: "0.0.0.0",
+        port: "8090",
+        hot: true,
+        liveReload: false,
+        // open: {
+        //     app: ["firefox"]
+        // },
+        overlay: true,
+        publicPath: "/dist/"
+    }
+};
+```
+
+### useLocalIp
+
+`boolean=false`
+
+是否运行打开页面的时候使用本地ip：
+
+```js
+ devServer: {
+        before(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                req.query.name="hello "+req.query.name;
+                next();
+            });
+        },
+        after(app, server, compiler) {
+            app.get("/login",(req,res,next)=>{
+                res.json({msg: req.query.name});
+            });
+        },
+        clientLogLevel: "info",
+        allowedHosts: [
+            "localhost"
+        ],
+        contentBase: path.join(process.cwd(), "lib"),
+        // contentBasePublicPath: "/assets",
+        filename: /app\.js/,
+        headers: {
+            'X-Custom-Foo': 'bar'
+        },
+        historyApiFallback: true,
+        host: "0.0.0.0",
+        port: "8090",
+        hot: true,
+        liveReload: false,
+        open: true,
+        useLocalIp: true,
+        overlay: true,
+        publicPath: "/dist/"
+    }
+```
+
+当我们运行webpack-dev-server的时候，浏览器就会默认打开：http://192.168.2.103:8090/页面了（我电脑本地ip:192.168.2.103）。
+
+### watchContentBase
+
+`boolean=false`
+
+是否监听contentBase目录的变化，前面我们分析过contentBase配置（静态目录），默认静态目录变化的时候当我们开启hot模式的时候是不会刷新页面的，但是我们可以设置watchContentBase=true来监听静态目录的变化来做到页面的自动刷新。
+
+👌，webpack-dev-server内容我们就介绍到这里了，还有一些其它的配置我们就不一一分析了，大家自己根据官网和源码走一遍demo就ok了。
+
+本节到这里就结束了，后面会对剩下的devtool、watch、externals等等再做分析，敬请期待！
 
