@@ -112,4 +112,50 @@ config
     .performance
         .hints("warning")
         .end();
+config.plugin("analyzer").use(require('webpack-bundle-analyzer').BundleAnalyzerPlugin,[])
+
+// config.optimization.minimize(true);
+// config.optimization.minimizer("terser").use(require("terser-webpack-plugin"), [
+//     {
+//         extractComments: false,
+//         terserOptions: {
+//             compress: {
+//                 drop_console: true
+//             },
+//             output:{
+//                 comments: false,
+//             }
+//         }
+//     }
+// ])
+config.optimization.splitChunks({
+    cacheGroups: {
+        vendors: {
+            test: /(node_modules\/vue|node_modules\/babel-polyfill)/,
+            // cacheGroupKey here is `commons` as the key of the cacheGroup
+            name(module, chunks, cacheGroupKey) {
+                return `vendor`;
+            },
+            priority: 100,
+            minChunks: 1,
+            chunks: 'all'
+        },
+        'async-commons': { // 异步加载公共包、组件等
+            chunks: 'async',
+            minChunks: 2,
+            name: 'async-commons',
+            priority: 90,
+        },
+        commons: { // 其他同步加载公共包
+            chunks: 'all',
+            minChunks: 2,
+            name: 'commons',
+            priority: 110,
+        },
+},
+    automaticNameDelimiter:"@"
+});
+config.optimization.runtimeChunk({
+    name: entrypoint => `runtime!!!${entrypoint.name}`
+})
 module.exports = config.toConfig();

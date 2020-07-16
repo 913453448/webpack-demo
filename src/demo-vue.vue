@@ -7,7 +7,6 @@
 </template>
 
 <script>
-    import "babel-polyfill";
     export default {
         name: 'demo-vue',
         data(){
