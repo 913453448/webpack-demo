@@ -3,7 +3,7 @@ const config = new Config();
 const path = require("path");
 
 config
-    .mode("production")
+    .mode("development")
     .context(path.resolve(__dirname, "./src"))
     .entry("app")
         .add("./index.js")
@@ -115,5 +115,15 @@ config
 
 config
     .optimization
-        .minimize(false);
+        .minimize(true)
+        .minimizer("terser")
+            .use(require("terser-webpack-plugin"),[{
+                extractComments: false,
+                terserOptions:{
+                    output: {
+                        comments: false
+                    }
+                }
+            }]);
+// config.plugin("webpack-bundle-analyzer").use(require("webpack-bundle-analyzer").BundleAnalyzerPlugin,[]);
 module.exports = config.toConfig();
