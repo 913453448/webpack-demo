@@ -3,7 +3,7 @@ const config = new Config();
 const path = require("path");
 
 config
-    .mode("development")
+    .mode("production")
     .context(path.resolve(__dirname, "./src"))
     .entry("app")
         .add("./index.js")
@@ -112,4 +112,8 @@ config
     .performance
         .hints("warning")
         .end();
+
+config
+    .optimization
+        .minimize(false);
 module.exports = config.toConfig();

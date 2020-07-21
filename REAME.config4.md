@@ -41,3 +41,94 @@ this.set("optimization.minimize", "make", options =>
 ...
 ```
 
+可以看到，`mode`为“production”的时候默认是开启的，我们可以这样设置：
+
+**webpack.config.js**
+
+```js
+module.exports = {
+  //...
+  optimization: {
+    minimize: options.mode === "production"
+  }
+};
+```
+
+### minimizer
+
+`[TerserPlugin]` and or `[function (compiler)]`
+
+压缩代码使用的插件，默认是[TerserPlugin](https://webpack.js.org/plugins/terser-webpack-plugin/) ，你也可以使用该选项覆盖默认的插件。
+
+**webpack.config.js**
+
+```js
+const TerserPlugin = require('terser-webpack-plugin');
+
+module.exports = {
+  optimization: {
+    minimizer: [
+      new TerserPlugin({
+        cache: true,
+        parallel: true,
+        sourceMap: true, // Must be set to true if using source-maps in production
+        terserOptions: {
+          // https://github.com/webpack-contrib/terser-webpack-plugin#terseroptions
+        }
+      }),
+    ],
+  }
+};
+```
+
+或者使用方法：
+
+```js
+module.exports = {
+  optimization: {
+    minimizer: [
+      (compiler) => {
+        const TerserPlugin = require('terser-webpack-plugin');
+        new TerserPlugin({ /* your config */ }).apply(compiler);
+      }
+    ],
+  }
+};
+```
+
+源码位置：
+
+lib/WebpackOptionsDefaulter.js(默认插件)
+
+```js
+...
+this.set("optimization.minimizer", "make", options => [
+			{
+				apply: compiler => {
+					// Lazy load the Terser plugin
+					const TerserPlugin = require("terser-webpack-plugin");
+					new TerserPlugin().apply(compiler);
+				}
+			}
+		]);
+...
+```
+
+lib/WebpackOptionsApply.js：
+
+```js
+...
+		if (options.optimization.minimize) {
+			for (const minimizer of options.optimization.minimizer) {
+				if (typeof minimizer === "function") {
+					minimizer.call(compiler, compiler);
+				} else {
+					minimizer.apply(compiler);
+				}
+			}
+		}
+...
+```
+
+ok！我们结合demo用一下这个选项，首先，我们把`minimize`选项设置成`false`,
+
