@@ -8,6 +8,9 @@ config
     .entry("app")
         .add("./index.js")
         .end()
+    .entry("app2")
+        .add("./index2.js")
+        .end()
     .output
         .path(path.join(process.cwd(), "lib"))
         .pathinfo(false)
@@ -16,7 +19,7 @@ config
         .end()
     .set("experiments",{})
     .module
-        // .noParse(/babel-polyfill/)
+        .noParse(/polyfill/)
         .rule("vue")
             .test(/\.vue$/)
             .use("vue-loader")
@@ -124,6 +127,23 @@ config
                         comments: false
                     }
                 }
-            }]);
-// config.plugin("webpack-bundle-analyzer").use(require("webpack-bundle-analyzer").BundleAnalyzerPlugin,[]);
+            }])
+            .end()
+        .splitChunks({
+            chunks: "all",
+            cacheGroups: {
+                default: {
+                    idHint: "",
+                    reuseExistingChunk: true,
+                    minChunks: 2,
+                    priority: -20,
+                    name: (module, chunks, cacheGroupKey)=>{
+                        //app~app2
+                        const name=chunks.map((chunk)=>chunk.name).join("~");
+                        return name;
+                    }
+                }
+            }
+        })
+config.plugin("webpack-bundle-analyzer").use(require("webpack-bundle-analyzer").BundleAnalyzerPlugin,[]);
 module.exports = config.toConfig();
