@@ -1373,4 +1373,486 @@ this.set("optimization.splitChunks.cacheGroups.default", {
 
 所以为了让default起作用，我们才会把polyfill复制了一份放到了src/assets让“demo-publicpath.js”导入。
 
-有没有发现webpack默认拆分出来的chunk名字又长又丑呢？
+有没有发现webpack默认拆分出来的chunk名字又长又丑呢？我们可以通过name属性去修改默认的name：
+
+webpack-chain.js
+
+```js
+.splitChunks({
+            chunks: "all",
+            cacheGroups: {
+                default: {
+                    idHint: "",
+                    reuseExistingChunk: true,
+                    minChunks: 2,
+                    priority: -20,
+                    name: (module, chunks, cacheGroupKey)=>{
+                        return "chunk-common";
+                    }
+                }
+            }
+```
+
+效果就不演示了，小伙伴自己去运行。
+
+ok，如果不想用默认cacheGroups的“default”跟“vendors”配置的话，我们只需要将它们置成false就可以了，
+
+```js
+ .splitChunks({
+          	...
+            cacheGroups: {
+                default: false,
+                defaultVendors: false
+            }
+        })
+```
+
+
+
+#### maxInitialRequests
+
+表示允许入口并行加载的最大请求数,之所以有这个配置也是为了对拆分数量进行限制，不至于拆分出太多模块导致请求数量过多而得不偿失。
+
+这里需要注意几点：
+
+- 入口文件本身算一个请求
+- 如果入口里面有动态加载得模块这个不算在内
+- 通过runtimeChunk拆分出的runtime不算在内
+- 只算js文件的请求，css不算在内
+- 如果同时又两个模块满足cacheGroup的规则要进行拆分，但是maxInitialRequests的值只能允许再拆分一个模块，那尺寸更大的模块会被拆分出来
+
+看一下webpack默认配置：
+
+```js
+...
+this.set("optimization.splitChunks.maxInitialRequests", "make", options => {
+  //生产环境是4个，测试环境不限制
+			return isProductionLikeMode(options) ? 4 : Infinity;
+		});
+...
+```
+
+demo当前配置：
+
+```js
+const Config = require('webpack-chain');
+const config = new Config();
+const path = require("path");
+
+config
+    .mode("development")
+    .context(path.resolve(__dirname, "./src"))
+    .entry("app")
+        .add("./index.js")
+        .end()
+    .entry("app2")
+        .add("./index2.js")
+        .end()
+    .output
+        .path(path.join(process.cwd(), "lib"))
+        .pathinfo(false)
+        .filename("[name].[contenthash:16].[fullhash:16].[id].js")
+        .chunkFilename("[id].js")
+        .end()
+    .set("experiments",{})
+    .module
+        .noParse(/polyfill/)
+        .rule("vue")
+            .test(/\.vue$/)
+            .use("vue-loader")
+                .loader("vue-loader")
+                .end()
+            .end()
+        .rule("sass")
+            .test( /\.(sass|scss)$/)
+            .use("style-loader")
+                .loader("style-loader")
+                .end()
+            .use("css-loader")
+                .loader("css-loader")
+                .end()
+            .use("postcss-loader")
+                .loader("postcss-loader")
+                .options( {
+                    config: {
+                        path: path.resolve(__dirname, "./postcss.config.js")
+                    }
+                })
+                .end()
+            .use("sass-loader")
+                .loader("sass-loader")
+                .end()
+            .end()
+        .rule("png")
+            .test(/\.png$/)
+            .oneOf("png-loader")
+                .rule("url-loader")
+                    .resourceQuery(/inline/)
+                    .use("url-loader")
+                        .loader("url-loader")
+                        .options({
+                            limit: 1024 * 1024 * 10
+                        })
+                        .end()
+                    .end()
+                .rule("file-loader")
+                    .resourceQuery(/external/)
+                    .use("file-loader")
+                        .loader("file-loader")
+                        .end()
+                    .end()
+                .end()
+            .end()
+        .end()
+    .resolve
+        .alias
+            .set("DemoVue", path.resolve(__dirname, "./src/demo-vue.vue"))
+            .end()
+        .extensions
+            .add(".wasm").add(".mjs").add(".js").add(".json").add(".vue")
+            .end()
+        .modules
+            .add(path.resolve(__dirname, "src")).add("node_modules")
+            .end()
+        .unsafeCache(/demo-publicpath/)
+        .end()
+    .plugin("vue-loader-plugin")
+        .use(require("vue-loader-plugin"),[])
+        .end()
+    .devServer
+        .before((app, server, compiler)=>{
+            app.get("/login",(req,res,next)=>{
+                req.query.name="hello "+req.query.name;
+                next();
+            });
+        })
+        .after((app, server, compiler)=>{
+            app.get("/login",(req,res,next)=>{
+                res.json({msg: req.query.name});
+            });
+        })
+        .clientLogLevel("info")
+        .allowedHosts
+            .add("localhost")
+            .end()
+        .contentBase(path.join(process.cwd(), "lib"))
+        .filename(/app\.js/)
+        .headers({
+            'X-Custom-Foo': 'bar'
+        })
+        .historyApiFallback(true)
+        .host("0.0.0.0")
+        .port("8090")
+        .hot(true)
+        .set("liveReload", true)
+        .open(true)
+        .useLocalIp(true)
+        .overlay(true)
+        .end()
+    .performance
+        .hints("warning")
+        .end();
+
+config
+    .optimization
+        .minimize(true)
+        .minimizer("terser")
+            .use(require("terser-webpack-plugin"),[{
+                extractComments: false,
+                terserOptions:{
+                    output: {
+                        comments: false
+                    }
+                }
+            }])
+            .end()
+        .splitChunks({
+            chunks: "all",
+            cacheGroups: {
+                default: {
+                    idHint: "",
+                    reuseExistingChunk: true,
+                    minChunks: 2,
+                    priority: -20,
+                    name: (module, chunks, cacheGroupKey)=>{
+                        return "commons";
+                    }
+                }
+            }
+        })
+config.plugin("webpack-bundle-analyzer").use(require("webpack-bundle-analyzer").BundleAnalyzerPlugin,[]);
+module.exports = config.toConfig();
+```
+
+然后webpack打包后会生成：
+
+```bash
+63fe41824cb8236c0896a71b7df7f461.png
+app.0287e18f3a59d8de.032bbe1fbfafc5e2.app.js
+app2.58808f5a4e707707.032bbe1fbfafc5e2.app2.js
+commons.cfe1450bd9c9d2ff.032bbe1fbfafc5e2.commons.js
+demo-vue.js
+vendors-node_modules_css-loader_dist_runtime_api_js-node_modules_style-loader_dist_runtime_in-e18f0d.js
+vendors-node_modules_vue_dist_vue_runtime_esm_js.1c5043955daac720.032bbe1fbfafc5e2.vendors-node_modules_vue_dist_vue_runtime_esm_js.js
+```
+
+入口app的requests有：
+
+- app.0287e18f3a59d8de.032bbe1fbfafc5e2.app.js
+- commons.cfe1450bd9c9d2ff.032bbe1fbfafc5e2.commons.js
+- vendors-node_modules_vue_dist_vue_runtime_esm_js.1c5043955daac720.032bbe1fbfafc5e2.vendors-node_modules_vue_dist_vue_runtime_esm_js.js
+
+app2跟app一样，`maxInitialRequests`默认是4，所以可以正常分离出“commons.cfe1450bd9c9d2ff.032bbe1fbfafc5e2.commons.js”，如果我们将`maxInitialRequests`设置“2”试试，
+
+webpack-chain.js:
+
+```js
+ .splitChunks({
+            chunks: "all",
+            maxInitialRequests: 2,
+            cacheGroups: {
+                default: {
+                    idHint: "",
+                    reuseExistingChunk: true,
+                    minChunks: 2,
+                    priority: -20,
+                    name: (module, chunks, cacheGroupKey)=>{
+                        return "commons";
+                    }
+                }
+            }
+        })
+```
+
+webpack编译看结果：
+
+```js
+63fe41824cb8236c0896a71b7df7f461.png
+app.0644d4709680673b.2d87a8324473e235.app.js
+app2.0c27f9cb5e923e85.2d87a8324473e235.app2.js
+demo-vue.js
+vendors-node_modules_css-loader_dist_runtime_api_js-node_modules_style-loader_dist_runtime_in-e18f0d.js
+vendors-node_modules_vue_dist_vue_runtime_esm_js.1c5043955daac720.2d87a8324473e235.vendors-node_modules_vue_dist_vue_runtime_esm_js.js
+```
+
+可以看到，“commons”并没有被分离出来。
+
+#### maxAsyncRequests
+
+maxAsyncRequests跟maxInitialRequests差不多，maxAsyncRequests主要是用来限制异步模块内部的并行最大请求数的。
+
+在我们demo中指的就是“demo-vue.vue”异步组件，目前demo-vue.vue的requests有：
+
+1. demo-vue.js
+2. vendors-node_modules_css-loader_dist_runtime_api_js-node_modules_style-loader_dist_runtime_in-e18f0d.js
+
+有小伙伴要疑问了“难道异步组件不需要依赖vue吗？”，也就是“vendors-node_modules_vue_dist_vue_runtime_esm_js.1c5043955daac720.2d87a8324473e235.vendors-node_modules_vue_dist_vue_runtime_esm_js.js”文件，因为在入口文件中也有依赖vue，所以webpack认为vue是必须存在的，因此不算在里面。
+
+ok, 如果我们把maxAsyncRequests改成“1”看一下还会分离“vendors-node_modules_css-loader_dist_runtime_api_js-node_modules_style-loader_dist_runtime_in-e18f0d.js”文件吗？
+
+```bash
+63fe41824cb8236c0896a71b7df7f461.png
+app.425e43abcaba52da.cd98b0378c0ec2df.app.js
+app2.ca0b00010af3e31c.cd98b0378c0ec2df.app2.js
+demo-vue.js
+vendors-node_modules_vue_dist_vue_runtime_esm_js.1c5043955daac720.cd98b0378c0ec2df.vendors-node_modules_vue_dist_vue_runtime_esm_js.js
+```
+
+可以看到，最后“vendors-node_modules_css-loader_dist_runtime_api_js-node_modules_style-loader_dist_runtime_in-e18f0d.js”文件没有生成，此时demo-vue.vue（异步组件）的requests有：
+
+1. demo-vue.js
+
+## 实战
+
+ok！说了那么多概念性的东西，我们结合demo来点平时项目中会用到的配置，比如我们demo这里，目前有两个入口“app”跟“app1”，分包规则如下：
+
+1. node_modules底下的依赖跟polyfill都放入一个叫“chunk-vendors”的包中
+2. 引用次数超过两次的放入到“chunk-common”包中。
+
+ok, 了解完需求后我们直接修改一下配置文件：
+
+webpack-chain.js：
+
+```js
+const Config = require('webpack-chain');
+const config = new Config();
+const path = require("path");
+
+config
+    .mode("development")
+    .context(path.resolve(__dirname, "./src"))
+    .entry("app")
+        .add("./index.js")
+        .end()
+    .entry("app2")
+        .add("./index2.js")
+        .end()
+    .output
+        .path(path.join(process.cwd(), "lib"))
+        .pathinfo(false)
+        .filename("[name].[contenthash:16].[fullhash:16].[id].js")
+        .chunkFilename("[id].js")
+        .end()
+    .set("experiments",{})
+    .module
+        .noParse(/polyfill/)
+        .rule("vue")
+            .test(/\.vue$/)
+            .use("vue-loader")
+                .loader("vue-loader")
+                .end()
+            .end()
+        .rule("sass")
+            .test( /\.(sass|scss)$/)
+            .use("style-loader")
+                .loader("style-loader")
+                .end()
+            .use("css-loader")
+                .loader("css-loader")
+                .end()
+            .use("postcss-loader")
+                .loader("postcss-loader")
+                .options( {
+                    config: {
+                        path: path.resolve(__dirname, "./postcss.config.js")
+                    }
+                })
+                .end()
+            .use("sass-loader")
+                .loader("sass-loader")
+                .end()
+            .end()
+        .rule("png")
+            .test(/\.png$/)
+            .oneOf("png-loader")
+                .rule("url-loader")
+                    .resourceQuery(/inline/)
+                    .use("url-loader")
+                        .loader("url-loader")
+                        .options({
+                            limit: 1024 * 1024 * 10
+                        })
+                        .end()
+                    .end()
+                .rule("file-loader")
+                    .resourceQuery(/external/)
+                    .use("file-loader")
+                        .loader("file-loader")
+                        .end()
+                    .end()
+                .end()
+            .end()
+        .end()
+    .resolve
+        .alias
+            .set("DemoVue", path.resolve(__dirname, "./src/demo-vue.vue"))
+            .end()
+        .extensions
+            .add(".wasm").add(".mjs").add(".js").add(".json").add(".vue")
+            .end()
+        .modules
+            .add(path.resolve(__dirname, "src")).add("node_modules")
+            .end()
+        .unsafeCache(/demo-publicpath/)
+        .end()
+    .plugin("vue-loader-plugin")
+        .use(require("vue-loader-plugin"),[])
+        .end()
+    .devServer
+        .before((app, server, compiler)=>{
+            app.get("/login",(req,res,next)=>{
+                req.query.name="hello "+req.query.name;
+                next();
+            });
+        })
+        .after((app, server, compiler)=>{
+            app.get("/login",(req,res,next)=>{
+                res.json({msg: req.query.name});
+            });
+        })
+        .clientLogLevel("info")
+        .allowedHosts
+            .add("localhost")
+            .end()
+        .contentBase(path.join(process.cwd(), "lib"))
+        .filename(/app\.js/)
+        .headers({
+            'X-Custom-Foo': 'bar'
+        })
+        .historyApiFallback(true)
+        .host("0.0.0.0")
+        .port("8090")
+        .hot(true)
+        .set("liveReload", true)
+        .open(true)
+        .useLocalIp(true)
+        .overlay(true)
+        .end()
+    .performance
+        .hints("warning")
+        .end();
+
+config
+    .optimization
+        .minimize(true)
+        .minimizer("terser")
+            .use(require("terser-webpack-plugin"),[{
+                extractComments: false,
+                terserOptions:{
+                    output: {
+                        comments: false
+                    }
+                }
+            }])
+            .end()
+        .splitChunks({
+            cacheGroups: {
+                vendors: {
+                    name: `chunk-vendors`,
+                    test: /[\\/]node_modules[\\/]/,
+                    priority: -10,
+                    chunks: 'all'
+                },
+                common: {
+                    name: `chunk-common`,
+                    minChunks: 2,
+                    priority: -20,
+                    chunks: 'all',
+                    reuseExistingChunk: true
+                }
+            }
+        })
+config.plugin("webpack-bundle-analyzer").use(require("webpack-bundle-analyzer").BundleAnalyzerPlugin,[]);
+module.exports = config.toConfig();
+```
+
+然后我们webpack打包编译：
+
+```js
+63fe41824cb8236c0896a71b7df7f461.png
+app.55ad00d0136c7d7d.306645240be8f953.app.js
+app2.efd24a48f5ab103e.306645240be8f953.app2.js
+chunk-common.3baec624a3539123.306645240be8f953.chunk-common.js
+chunk-vendors.js
+demo-vue.js
+```
+
+- chunk-vendors.js: 包含了node_modules底下的模块（vue、style-loader等等。）
+- chunk-common.3baec624a3539123.306645240be8f953.chunk-common.js： 包含了assets/polyfill.js
+
+ok, 我们直接用bundle-analyzer工具查看一下：
+
+chunk-vendors.js
+
+![chunk-vendor](/Users/yinqingyang/前端架构系列之(webpack)/webpack-demo/chunk-vendor.png)
+
+chunk-common.3baec624a3539123.306645240be8f953.chunk-common.js:
+
+![chunk-common](/Users/yinqingyang/前端架构系列之(webpack)/webpack-demo/chunk-common.png)
+
+## 总结
+
+我们花了很多章节来介绍webpack，不得不说webpack内容是真的多，对webpack作者佩服的五体投地，开源不易啊！！
+
+好啦！我们的webpack差不多就告一段落了，后面可能会对vue、react脚手架对webpack的配置做分析，敬请期待！！
+

@@ -130,18 +130,19 @@ config
             }])
             .end()
         .splitChunks({
-            chunks: "all",
             cacheGroups: {
-                default: {
-                    idHint: "",
-                    reuseExistingChunk: true,
+                vendors: {
+                    name: `chunk-vendors`,
+                    test: /[\\/]node_modules[\\/]/,
+                    priority: -10,
+                    chunks: 'all'
+                },
+                common: {
+                    name: `chunk-common`,
                     minChunks: 2,
                     priority: -20,
-                    name: (module, chunks, cacheGroupKey)=>{
-                        //app~app2
-                        const name=chunks.map((chunk)=>chunk.name).join("~");
-                        return name;
-                    }
+                    chunks: 'all',
+                    reuseExistingChunk: true
                 }
             }
         })
